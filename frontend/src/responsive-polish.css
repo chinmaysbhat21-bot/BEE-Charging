@@ -1,0 +1,336 @@
+/* Responsive refinement layer for the consumer and host experience. */
+:root {
+  --ev-lime: #c6f04a;
+  --ev-mist: #f5f6f2;
+  --ev-soft: #e8ebe4;
+  --ev-line: #d7dbd2;
+  --ev-muted: #647067;
+  --ev-radius-xl: 24px;
+  --ev-radius-card: 18px;
+  --ev-shadow: 0 14px 38px rgba(20, 31, 23, .08);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body { background: #edf0e9; }
+
+.consumer-shell {
+  width: min(100%, 1480px);
+  min-height: 100svh;
+  margin: 0 auto;
+  overflow: visible;
+  background: #fff;
+  box-shadow: 0 18px 70px rgba(18, 25, 20, .08);
+}
+
+.consumer-header,
+.consumer-shell.book-shell .consumer-header.booking-main-header,
+.consumer-shell.profile-shell .consumer-header {
+  min-height: 76px;
+  padding: 14px clamp(20px, 4vw, 54px);
+  justify-content: flex-start;
+  gap: 16px;
+  border-color: #edf0ea;
+  box-shadow: 0 1px 0 rgba(25, 34, 27, .02);
+}
+
+.consumer-header h1 {
+  margin: 0;
+  text-align: left;
+  font-size: clamp(18px, 2vw, 22px);
+  font-weight: 780;
+  letter-spacing: -.055em;
+}
+
+.consumer-header h1::before {
+  width: 38px;
+  height: 38px;
+  margin-right: 10px;
+  border-radius: 13px;
+  background-color: var(--ev-lime);
+}
+
+.consumer-header-spacer { flex: 1; width: auto; min-width: 0; }
+
+.menu-toggle {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 14px;
+  background: var(--ev-mist);
+  font-size: 19px;
+  transition: background-color .18s ease, transform .18s ease;
+}
+
+.menu-toggle:hover { background: var(--ev-lime); transform: translateY(-1px); }
+
+.consumer-menu {
+  position: fixed;
+  top: 68px;
+  left: max(16px, calc((100vw - 1480px) / 2 + 24px));
+  z-index: 200;
+  padding: 7px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px;
+  background: #172019;
+  box-shadow: 0 18px 45px rgba(10, 18, 12, .2);
+}
+
+.consumer-menu button { min-height: 44px; padding: 11px 14px; border-radius: 12px; }
+
+.consumer-content:not(.profile-content-scroll) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.book-slot-page {
+  width: 100%;
+  max-width: 1320px;
+  margin-inline: auto;
+  padding: 22px clamp(18px, 4vw, 58px) 130px;
+  gap: 18px;
+}
+
+.booking-sticky-stack {
+  top: 75px !important;
+  border-radius: 0 0 20px 20px;
+}
+
+.booking-topbar {
+  border-color: var(--ev-soft);
+  border-radius: 20px 20px 0 0;
+}
+
+.booking-controls {
+  border-color: var(--ev-soft);
+  border-radius: 0 0 20px 20px;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.booking-control select,
+.booking-control input[type='date'] { min-height: 46px; }
+
+.booking-filter-chip {
+  min-height: 42px;
+  padding: 9px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.booking-results-toolbar { min-height: 54px; }
+
+.charging-station-card {
+  gap: 18px;
+  padding: 14px;
+  border-color: #e9ece6;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 5px 20px rgba(20, 31, 23, .045);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.charging-station-card:hover {
+  border-color: #c9d3bf;
+  box-shadow: 0 12px 30px rgba(20, 31, 23, .09);
+  transform: translateY(-2px);
+}
+
+.charging-station-card-image { border-radius: 14px; background: #eef1e9; }
+.charging-station-card-description { gap: 7px; }
+.charging-station-card-description h3 { font-size: 1.02rem; }
+.charging-station-card-address { line-height: 1.45; }
+.charging-station-card-facts { gap: 7px 12px; }
+.charging-station-card-actions { align-items: flex-end; }
+
+.charging-station-view-details,
+.station-details-book-button,
+.button-primary,
+.signup-button:not(.button-secondary) {
+  min-height: 46px;
+  padding: 11px 17px;
+  border-radius: 999px;
+  font-weight: 760;
+}
+
+.consumer-placeholder.profile-page,
+.host-dashboard,
+.my-orders-page,
+.history-page,
+.station-details-page {
+  border-radius: 0;
+}
+
+.consumer-placeholder.profile-page {
+  max-width: 920px;
+  margin: 24px auto;
+  padding: clamp(24px, 4vw, 48px);
+}
+
+.profile-hero { align-items: center; gap: 24px; padding-bottom: 28px; }
+.profile-photo-wrap { width: 88px; height: 88px; flex: 0 0 88px; }
+.profile-list-section { padding-top: 24px; }
+.profile-item-card { padding: 18px; }
+
+.host-dashboard { max-width: none; padding: clamp(24px, 4vw, 54px); }
+.host-dashboard-actions { border-radius: 22px; }
+.host-station-card, .host-dashboard .host-station-item { border-radius: 18px; }
+
+.my-orders-page, .history-page { padding: 32px clamp(18px, 4vw, 56px) 132px; }
+.my-orders-title { margin-bottom: 24px; font-size: clamp(32px, 4vw, 44px); }
+.my-orders-list { max-width: 1120px; gap: 14px; }
+.my-order-card, .history-order-card { border-radius: 18px; }
+
+.station-details-page { max-width: 1320px; margin-inline: auto; padding-inline: clamp(16px, 4vw, 56px); }
+.station-details-sticky-top { top: 75px; }
+.station-details-summary { border-radius: 22px; }
+.station-details-card { border-radius: 18px; }
+.station-details-back { right: max(22px, calc((100vw - 1440px) / 2 + 28px)); }
+
+.consumer-bottom-nav {
+  bottom: max(18px, env(safe-area-inset-bottom));
+  width: min(390px, calc(100% - 32px));
+  padding: 7px;
+  border: 1px solid rgba(223, 228, 218, .9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 12px 36px rgba(17, 26, 19, .14);
+  backdrop-filter: blur(18px);
+}
+
+.consumer-bottom-nav button { min-height: 54px; border-radius: 999px; }
+.consumer-bottom-nav button.active { background: var(--ev-lime); color: var(--ev-ink); }
+
+.app {
+  min-height: 100svh;
+  padding: clamp(18px, 5vw, 64px);
+  background:
+    radial-gradient(ellipse at 15% 12%, rgba(198,240,74,.18), transparent 32%),
+    radial-gradient(ellipse at 88% 88%, rgba(198,240,74,.10), transparent 30%),
+    #141b15;
+}
+
+.app .card {
+  max-width: 480px;
+  padding: clamp(28px, 5vw, 48px);
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 26px;
+  box-shadow: 0 28px 90px rgba(0,0,0,.24);
+}
+
+.app .card input { min-height: 48px; border-radius: 13px; }
+.app .card button[type='submit'] { min-height: 50px; border-radius: 999px; }
+.signup-page { background: #141b15; }
+.signup-card { border-radius: 26px; box-shadow: 0 28px 90px rgba(0,0,0,.24); }
+
+@media (min-width: 701px) {
+  .consumer-shell { min-height: calc(100svh - 36px); margin-block: 18px; border-radius: 26px; }
+  .consumer-header { border-radius: 26px 26px 0 0; }
+  .consumer-shell.book-shell .consumer-header.booking-main-header,
+  .consumer-shell.profile-shell .consumer-header { border-radius: 26px 26px 0 0; }
+}
+
+@media (max-width: 700px) {
+  body { background: #fff; }
+  .consumer-shell { width: 100%; min-height: 100svh; margin: 0; border-radius: 0; box-shadow: none; }
+  .consumer-header,
+  .consumer-shell.book-shell .consumer-header.booking-main-header,
+  .consumer-shell.profile-shell .consumer-header {
+    min-height: 62px;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .consumer-header h1 { font-size: clamp(16px, 4.5vw, 19px); }
+  .consumer-header h1::before { width: 32px; height: 32px; margin-right: 7px; border-radius: 11px; }
+  .consumer-header-spacer { flex: 1; width: auto; min-width: 0; }
+  .menu-toggle { flex-basis: 38px; width: 38px; height: 38px; border-radius: 12px; }
+  .consumer-menu { position: fixed; top: 57px; left: 12px; }
+  .consumer-content:not(.profile-content-scroll) { padding-bottom: 0; }
+  .book-slot-page { padding: 12px 12px 130px; gap: 12px; }
+  .booking-sticky-stack { top: 61px !important; border-radius: 0 0 17px 17px; }
+  .booking-topbar { border-radius: 17px 17px 0 0; }
+  .booking-controls { gap: 10px !important; padding: 12px !important; border-radius: 0 0 17px 17px; }
+  .booking-control select,
+  .booking-control input[type='date'] { min-height: 44px; }
+  .booking-filter-chip { min-height: 40px; padding: 8px 11px; }
+  .booking-results-toolbar { padding-inline: 2px; }
+  .charging-station-card { border-radius: 17px; }
+  .consumer-placeholder.profile-page { margin: 10px 12px; padding: 20px 17px; }
+  .profile-hero { gap: 16px; }
+  .profile-photo-wrap { width: 72px; height: 72px; flex-basis: 72px; }
+  .host-dashboard { padding: 22px 16px; }
+  .host-dashboard-actions { margin: 18px 0; }
+  .my-orders-page, .history-page { padding: 22px 14px 128px; }
+  .my-order-card { gap: 14px; }
+  .station-details-page { padding-inline: 12px; }
+  .station-details-sticky-top { top: 61px; padding: 10px 0; }
+  .station-details-summary { border-radius: 18px; }
+  .station-details-actions { bottom: 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .station-details-book-button { width: 100%; }
+  .consumer-bottom-nav {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100% - 24px);
+    padding: 5px;
+  }
+  .consumer-bottom-nav button { min-height: 50px; font-size: 12px; }
+  .app { padding: 20px 14px; }
+  .app .card { padding: 28px 22px; border-radius: 22px; }
+  .app .card h1 { font-size: clamp(34px, 10vw, 44px); }
+  .signup-page { padding: 18px 12px; }
+  .signup-card { padding: 25px 20px; border-radius: 22px; }
+}
+
+@media (max-width: 480px) {
+  .charging-station-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    align-items: start;
+    gap: 9px 13px;
+    padding: 12px;
+  }
+  .charging-station-card-image {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 66px;
+    height: 76px;
+    min-height: 76px;
+    border-radius: 13px;
+  }
+  .charging-station-card-description {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+    gap: 5px;
+  }
+  .charging-station-card-description h3 { font-size: .96rem; }
+  .charging-station-card-address,
+  .charging-station-card-facts { font-size: .78rem; }
+  .charging-station-card-actions {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+  }
+  .charging-station-card-actions > strong { font-size: .85rem; white-space: normal; }
+  .charging-station-view-details { min-height: 40px; padding: 8px 13px; font-size: .78rem; }
+  .booking-controls { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .booking-date-control, .booking-filter-control { grid-column: 1 / -1 !important; }
+  .booking-filter-options { gap: 6px; }
+  .booking-filter-chip { flex: 1 1 auto; justify-content: center; font-size: 11px !important; }
+  .profile-hero { align-items: flex-start; }
+  .my-order-card .cancel-booking-button { width: 100%; }
+}
+
+@media (max-width: 360px) {
+  .consumer-header h1 { font-size: 15px; }
+  .consumer-header h1::before { width: 28px; height: 28px; margin-right: 5px; }
+  .booking-controls { gap: 8px !important; padding: 10px !important; }
+  .booking-filter-chip { padding: 7px 5px; font-size: 10px !important; }
+  .charging-station-card { grid-template-columns: 58px minmax(0, 1fr); gap: 8px 10px; }
+  .charging-station-card-image { width: 58px; height: 70px; min-height: 70px; }
+}

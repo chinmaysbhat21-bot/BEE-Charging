@@ -1,0 +1,406 @@
+/*
+ * Reference UI implementation across all current consumer + host views.
+ * The 2026 Pilo screenshots use lime #C7FE2F, near black #090708,
+ * white #FFFFFF, and soft neutral grays. The reference's exact font
+ * family and original vector icons were not supplied, so native sans
+ * fallbacks and the existing functional icons are retained.
+ */
+
+/* Shell, sticky header, and reference-style floating mobile navigation */
+.app,.signup-page { min-height: 100svh; background: var(--ev-ink); padding: clamp(16px,4vw,48px); }
+.app { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
+.consumer-shell {
+  width: 100%; max-width: 1280px; margin-inline: auto;
+  min-height: 100svh; background: var(--ev-white); color: var(--ev-ink);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.2), 0 22px 85px rgba(0,0,0,.22);
+}
+.consumer-header,.consumer-shell.book-shell .consumer-header.booking-main-header,
+.consumer-shell.profile-shell .consumer-header {
+  background: var(--ev-white); border-bottom: 1px solid var(--ev-soft);
+  padding: 16px clamp(16px,3vw,36px); min-height: 72px;
+}
+.consumer-header h1 {
+  color: var(--ev-ink); font-size: clamp(20px,2.8vw,31px);
+  font-weight: 800; letter-spacing: -.07em; line-height: 1;
+}
+.consumer-header h1::before { content: '⚡'; display: inline-grid; place-items:center;
+  width: 38px;height:38px;margin-right: 10px;vertical-align:middle;
+  background:var(--ev-lime);color:var(--ev-ink);border-radius:50%;
+  font-size:20px;letter-spacing:0; }
+.menu-toggle,.profile-shortcut {
+  width: 42px;height:42px;padding:0;display:grid;place-items:center;
+  background: var(--ev-soft); border-radius:50%;color:var(--ev-ink);font-size:22px;
+}
+.menu-toggle:hover,.profile-shortcut:hover {background:var(--ev-lime);}
+.consumer-menu { background:var(--ev-ink);border:1px solid var(--ev-charcoal);
+  border-radius:var(--ev-radius-card);padding:8px;top:68px;
+  box-shadow:var(--ev-shadow);width:min(270px,calc(100vw - 24px)); }
+.consumer-menu button { color:var(--ev-white);background:transparent;border:0;
+  border-radius:15px;min-height:46px; }
+.consumer-menu button:hover,.consumer-menu button:focus-visible {background:var(--ev-lime);color:var(--ev-ink);}
+.consumer-content {color:var(--ev-ink);}
+.consumer-bottom-nav {bottom:12px;left:50%;right:auto;transform:translateX(-50%);
+  width:min(440px,calc(100% - 24px));padding:7px;
+  background:var(--ev-white);border:1px solid var(--ev-soft);
+  border-radius:999px;box-shadow:0 10px 40px rgba(0,0,0,.16);gap:7px;
+  padding-bottom:calc(7px + env(safe-area-inset-bottom)); }
+.consumer-bottom-nav button {min-width:0;border-radius:999px;color:var(--ev-ink);
+  gap:2px;min-height:54px;font-weight:700;transition:background-color .16s ease;}
+.consumer-bottom-nav button.active {background:var(--ev-lime);color:var(--ev-ink);}
+.consumer-bottom-nav button:hover:not(.active) {background:var(--ev-soft);}
+.bottom-nav-default-avatar,.profile-photo-default {background:var(--ev-lime);color:var(--ev-ink);}
+
+/* Screen typography, container geometry, surface hierarchy */
+:is(.card,.signup-card,.consumer-placeholder,.book-slot-card,.booking-picker-card) {
+  background:var(--ev-white);color:var(--ev-ink);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-xl);box-shadow:var(--ev-shadow);
+}
+.card {max-width:480px;padding:clamp(26px,5vw,48px);}
+.app .card h1 {color:var(--ev-ink);font-size:clamp(37px,6vw,58px);
+  line-height:.98;letter-spacing:-.075em;text-align:left;margin:0 0 14px;}
+.app .card h1::before {content:'⚡';display:grid;place-items:center;width:51px;height:51px;
+  background:var(--ev-lime);border-radius:15px;margin-bottom:22px;font-size:28px;letter-spacing:0;}
+.app .card h2 {text-align:left;font-size:25px;margin:28px 0 14px;}
+.app .card .subtitle {color:var(--ev-muted);text-align:left;font-size:15px;line-height:1.55;}
+.signup-page {background:var(--ev-ink);}
+.signup-card {max-width:610px;padding:clamp(22px,4vw,42px);}
+.signup-heading h1,.signup-success h2 {font-size:clamp(32px,5vw,46px);font-weight:800;letter-spacing:-.065em;color:var(--ev-ink);}
+.signup-heading p,.signup-eyebrow,.signup-progress-item span {color:var(--ev-muted);}
+.signup-brand-mark {background:var(--ev-lime);color:var(--ev-ink);width:52px;height:52px;
+  border-radius:16px;font-size:15px;box-shadow:none;}
+.signup-progress-node {border-radius:50%;}
+.signup-progress-node.is-current,.signup-progress-node.is-complete {background:var(--ev-lime);color:var(--ev-ink);border-color:var(--ev-ink);}
+.signup-progress-bar span {background:var(--ev-lime);}
+.signup-success-icon {color:var(--ev-ink);}
+:is(.profile-page,.host-dashboard,.my-orders-page,.book-slot-page,.history-page,.station-details-page) h2 {
+  color:var(--ev-ink);font-weight:800;letter-spacing:-.06em;
+}
+:is(.profile-page,.host-dashboard,.my-orders-page,.book-slot-page,.history-page,.station-details-page) h3 {
+  color:var(--ev-ink);letter-spacing:-.035em;
+}
+:where(.profile-page,.host-dashboard,.my-orders-page,.book-slot-page,.history-page) p {line-height:1.55;}
+:where(.subtitle,.my-orders-message,.history-subtitle,.station-details-address,.booking-selection-hint,
+  .charging-station-card-address,.booking-topbar-text em,.host-dashboard p,.profile-contact-info p) {color:var(--ev-muted);}
+
+/* All primary actions use the sample's neon-lime fill + dark lettering. */
+:where(.button-primary,.booking-add-button,.station-details-book-button,.charging-station-view-details,
+  .station-navbar-book,.host-dashboard .host-add-button,.signup-button,.signup-form button[type='submit']) {
+  background:var(--ev-lime);color:var(--ev-ink);border-color:var(--ev-lime);
+}
+.button,.back-button,.consumer-back,.station-navbar-book,.station-navbar-back,
+.charging-station-view-details,.station-details-book-button,
+.booking-map-button,.booking-picker-option,.host-dashboard button,
+.booking-topbar-edit,.booking-filter-chip,.booking-results-toolbar button,
+.signup-button,.signup-feedback-actions button {
+  border-radius:var(--ev-radius-pill);font-weight:750;
+  transition:background-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+.button-primary,.station-navbar-book,.station-details-book-button,.charging-station-view-details,
+.booking-add-button,.signup-button:not(.button-secondary),.host-dashboard button:not(.consumer-back) {
+  background:var(--ev-lime) !important;color:var(--ev-ink) !important;
+  border:1px solid var(--ev-lime) !important;
+}
+.button-primary:hover:not(:disabled),.station-navbar-book:hover:not(:disabled),
+.station-details-book-button:hover:not(:disabled),.charging-station-view-details:hover:not(:disabled),
+.host-dashboard button:hover:not(:disabled) {background:var(--ev-white) !important;color:var(--ev-ink) !important;
+  border-color:var(--ev-ink) !important;transform:translateY(-1px);}
+.button-secondary,.station-navbar-back,.back-button,.consumer-back,
+.booking-topbar-edit,.booking-picker-back,.station-details-back {
+  background:var(--ev-soft);color:var(--ev-ink);border:1px solid var(--ev-soft);
+}
+.button-secondary:hover:not(:disabled),.back-button:hover:not(:disabled),.consumer-back:hover:not(:disabled),
+.station-navbar-back:hover:not(:disabled) {background:var(--ev-charcoal);color:var(--ev-white);border-color:var(--ev-charcoal);}
+:is(.button-primary,.button-secondary,.signup-button,.back-button) {min-height:44px;}
+button:disabled {filter:grayscale(.35);opacity:.5 !important;}
+
+/* Field consistency across OTP, account, profile, charger filters and station forms */
+:where(.app,.signup-page,.consumer-shell) :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea) {
+  max-width:100%;min-height:44px;border:1px solid var(--ev-line);border-radius:14px;
+  background:var(--ev-mist);color:var(--ev-ink);padding:11px 14px;
+  font-size:15px;box-shadow:none;
+}
+:where(.app,.signup-page,.consumer-shell) :is(input:not([type='checkbox']):not([type='radio']):not([type='file']),select,textarea):focus {
+  outline:2px solid var(--ev-ink);outline-offset:1px;border-color:var(--ev-ink);
+  background:var(--ev-white);
+}
+:where(.app,.signup-page,.consumer-shell) :is(input,textarea)::placeholder {color:var(--ev-muted);opacity:1;}
+:where(.signup-page,.consumer-shell) :is(input[type='checkbox'],input[type='radio']) {accent-color:var(--ev-ink);}
+:is(.form-group label,.signup-field label,.booking-control > span,.profile-name-row > label,
+  .host-dashboard .host-station-form label) {color:var(--ev-charcoal);font-weight:700;}
+:where(.message,.success-message,.booking-error,.host-station-message,.host-station-error,.cancel-dialog-error) {
+  padding:12px 15px;border-radius:14px;font-size:14px;overflow-wrap:anywhere;
+}
+:where(.success-message,.host-station-message) {background:var(--ev-lime);color:var(--ev-ink);}
+:where(.booking-error,.host-station-error,.cancel-dialog-error,[role='alert']) {
+  background:var(--ev-mist);color:var(--ev-ink);border-left:4px solid var(--ev-ink);
+}
+
+/* Consumer profile: large friendly greeting, grey pill controls */
+.consumer-placeholder.profile-page {max-width:780px;margin:16px auto;padding:clamp(20px,4vw,40px);
+  border-radius:var(--ev-radius-xl);box-shadow:none;}
+.profile-hero {display:flex;gap:20px;padding-bottom:22px;border-bottom:1px solid var(--ev-soft);}
+.profile-hero h2 {font-size:clamp(27px,4vw,44px);line-height:1.04;max-width:440px;}
+.profile-photo-wrap {width:80px;height:80px;}
+.profile-photo {border:4px solid var(--ev-lime);}
+.profile-photo-edit {background:var(--ev-ink);color:var(--ev-lime);border-color:var(--ev-white);}
+.profile-list-section {padding-top:18px;border-top:1px solid var(--ev-soft);}
+.profile-list-section h3 {font-size:24px;font-weight:750;}
+.profile-item-card,.consumer-info,.profile-contact-info {
+  background:var(--ev-mist);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-card);box-shadow:none;
+}
+.icon-edit-button {border-radius:50%;background:var(--ev-lime);color:var(--ev-ink);min-width:40px;min-height:40px;}
+.inline-edit-actions button:first-child {background:var(--ev-lime);color:var(--ev-ink);}
+.inline-edit-actions button {background:var(--ev-soft);color:var(--ev-ink);border-radius:var(--ev-radius-pill);}
+.profile-item-actions {flex-wrap:wrap;}
+
+/* Consumer booking workflow: gray selection tiles, black results and neon CTA. */
+.consumer-shell.book-shell .consumer-content {background:var(--ev-white);}
+.book-slot-page {background:var(--ev-white);}
+.booking-sticky-stack {background:var(--ev-white) !important;}
+.booking-topbar {background:var(--ev-white);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-card);box-shadow:none;padding:9px 16px;}
+.booking-topbar-item {color:var(--ev-ink);border-radius:14px;}
+.booking-topbar-item:hover {background:var(--ev-mist);}
+.booking-topbar-address {border-bottom:1px solid var(--ev-soft);}
+.booking-topbar-icon,.booking-option-icon {background:var(--ev-lime);color:var(--ev-ink);
+  border-radius:50%;}
+.booking-topbar-text strong,.booking-selection-copy strong {color:var(--ev-ink);}
+.booking-topbar-text small,.booking-topbar-text em {color:var(--ev-muted);}
+.booking-topbar-edit {background:var(--ev-charcoal);color:var(--ev-white);border-color:var(--ev-charcoal);}
+.booking-controls {background:var(--ev-mist);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-card);box-shadow:none;}
+.booking-control,.booking-control>span {color:var(--ev-ink);}
+.booking-filter-options {color:var(--ev-ink);}
+.booking-filter-chip {background:var(--ev-white);color:var(--ev-ink);border:1px solid var(--ev-line);}
+.booking-filter-chip.active,.booking-filter-chip.selected,
+.booking-filter-chip:has(input:checked) {background:var(--ev-lime);border-color:var(--ev-lime);color:var(--ev-ink);}
+.booking-selection-row,.booking-picker-option {background:var(--ev-mist);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-card);color:var(--ev-ink);}
+.booking-picker-option:hover {background:var(--ev-lime);}
+.booking-results-scroll {background:var(--ev-white);}
+.booking-results-toolbar {background:var(--ev-white);color:var(--ev-ink);}
+.booking-results-empty,.station-no-slots,.history-empty {padding:24px;border:1px dashed var(--ev-line);
+  border-radius:var(--ev-radius-card);background:var(--ev-mist);color:var(--ev-muted);}
+.charging-station-card {background:var(--ev-mist);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-card);box-shadow:none;overflow:hidden;}
+.charging-station-card:hover {border-color:var(--ev-ink);box-shadow:0 10px 30px rgba(0,0,0,.08);}
+.charging-station-card-description h3 {color:var(--ev-ink);font-weight:800;}
+.charging-station-card-address,.charging-station-card-facts {color:var(--ev-muted);}
+.charging-station-card-actions > strong {color:var(--ev-ink);font-size:20px;}
+.charging-station-view-details {min-height:43px;}
+
+/* Station details: screenshot's black map-like surface + white information blocks */
+.station-details-page {background:var(--ev-white);border:0;box-shadow:none;
+  border-radius:var(--ev-radius-xl);}
+.station-details-sticky-top {background:var(--ev-white);box-shadow:none;border-bottom:1px solid var(--ev-soft);}
+.station-details-summary {background:var(--ev-ink);background-image:none !important;
+  color:var(--ev-white);border:0;border-radius:var(--ev-radius-xl);padding:24px;}
+.station-details-summary h2,.station-details-summary .station-details-address,
+.station-details-summary .station-details-price,.station-details-summary .station-details-duration,
+.station-details-summary .station-details-facts,.station-details-summary .station-details-fact,
+.station-details-summary .station-details-fact strong,.station-details-summary .station-details-metric strong,
+.station-details-summary .station-type-text {color:var(--ev-white) !important;}
+.station-details-summary .station-details-fact small,.station-details-summary .station-details-metric small {
+  color:var(--ev-line) !important;}
+.station-details-summary .station-details-eyebrow,
+.station-details-summary .station-details-fact-icon {color:var(--ev-lime) !important;}
+.station-details-slot-section,.station-details-card,.station-time-slot-list > * {
+  border-radius:var(--ev-radius-card);}
+.station-details-map-button,.station-details-refresh {background:var(--ev-charcoal);color:var(--ev-white);
+  border:1px solid var(--ev-charcoal);border-radius:var(--ev-radius-pill);}
+.station-details-map-button:hover,.station-details-refresh:hover {background:var(--ev-lime);color:var(--ev-ink);}
+.station-details-actions {gap:12px;}
+.station-details-back {color:var(--ev-ink);}
+
+/* Orders, history, and cancellation dialogs */
+.my-orders-page,.history-page {background:var(--ev-white);}
+.my-orders-title {font-size:clamp(30px,4vw,46px);color:var(--ev-ink);}
+.my-order-card,.history-order-card {background:var(--ev-mist);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-card);box-shadow:none;overflow-wrap:anywhere;}
+.my-order-details h3,.history-card-header h3 {color:var(--ev-ink);}
+.my-order-details p,.history-station-address {color:var(--ev-muted);}
+.my-order-card .booking-status,.history-status {background:var(--ev-ink);color:var(--ev-white);
+  border-radius:var(--ev-radius-pill);}
+.history-status-completed {background:var(--ev-lime);color:var(--ev-ink);}
+.history-status-cancelled {background:var(--ev-soft);color:var(--ev-ink);}
+.my-order-card .cancel-booking-button,.cancel-dialog-yes {background:var(--ev-charcoal);color:var(--ev-white);
+  border-color:var(--ev-charcoal);}
+.my-order-card .cancel-booking-button:hover:not(:disabled),.cancel-dialog-yes:hover:not(:disabled) {
+  background:var(--ev-ink);color:var(--ev-white);}
+.cancel-dialog-backdrop {background:rgba(0,0,0,.65);}
+.cancel-dialog {background:var(--ev-white);color:var(--ev-ink);border:1px solid var(--ev-soft);
+  border-radius:var(--ev-radius-xl);box-shadow:var(--ev-shadow);}
+.cancel-dialog h3 {color:var(--ev-ink);}
+.cancel-dialog-no {background:var(--ev-lime);color:var(--ev-ink);}
+
+/* Host: same reference cards, proportions and interaction states as consumer. */
+.consumer-placeholder.host-page {width:100%;max-width:1140px;margin:0 auto;padding:0;
+  border:0;box-shadow:none;}
+.host-dashboard {background:var(--ev-white);color:var(--ev-ink);min-height:0;
+  padding:clamp(20px,4vw,48px);border-radius:var(--ev-radius-xl);}
+.host-dashboard h1,.host-dashboard h2,.host-dashboard h3 {color:var(--ev-ink);}
+.host-dashboard h2 {font-size:clamp(30px,4vw,45px);}
+.host-dashboard h3 {font-size:22px;}
+.host-dashboard p {color:var(--ev-muted);}
+.host-dashboard-actions {background:var(--ev-ink);border-radius:var(--ev-radius-xl);
+  padding:clamp(18px,3vw,28px);margin:22px 0;text-align:left;}
+.host-dashboard-actions h3,.host-dashboard-actions p {color:var(--ev-white);}
+.host-dashboard-actions button {background:var(--ev-lime) !important;color:var(--ev-ink) !important;
+  border-color:var(--ev-lime) !important;}
+.host-dashboard .host-station-list {gap:14px;}
+.host-station-card,.host-dashboard .host-station-item {background:var(--ev-mist);
+  border:1px solid var(--ev-soft);border-radius:var(--ev-radius-card);box-shadow:none;
+  padding:clamp(16px,3vw,24px);min-width:0;overflow-wrap:anywhere;}
+.host-station-card-details {color:var(--ev-muted);}
+.host-station-card-actions {display:flex;flex-wrap:wrap;gap:8px;}
+.host-station-form,.host-dashboard .host-station-form {background:var(--ev-mist);
+  border:1px solid var(--ev-soft);border-radius:var(--ev-radius-xl);padding:clamp(16px,3vw,28px);}
+.host-dashboard .host-station-form input,.host-dashboard .host-station-form select,
+.host-dashboard .host-station-form textarea {background:var(--ev-white);color:var(--ev-ink);
+  border:1px solid var(--ev-line);border-radius:14px;}
+.host-dashboard button:focus-visible {outline:3px solid var(--ev-ink) !important;outline-offset:3px;}
+
+/* Dialog confirmations have their own inline styles in the existing JSX; force
+   matching affordances without intercepting the original handlers. */
+[role='dialog'] {font-family:var(--sans);color:var(--ev-ink);}
+[role='dialog'] h2,[role='dialog'] h3 {color:var(--ev-ink) !important;}
+[role='dialog'] .button-primary {background:var(--ev-lime) !important;color:var(--ev-ink) !important;}
+[role='dialog'] .button-secondary {background:var(--ev-soft) !important;color:var(--ev-ink) !important;}
+
+@media (min-width: 900px) {
+  .consumer-header {border-radius:0;}
+  .consumer-content:not(.profile-content-scroll) {max-width:none;}
+  .book-slot-page {padding-inline:clamp(22px,4vw,56px);}
+}
+@media (max-width: 700px) {
+  .consumer-header,.consumer-shell.book-shell .consumer-header.booking-main-header,
+  .consumer-shell.profile-shell .consumer-header {padding:12px 14px;min-height:62px;}
+  .consumer-header h1 {font-size:19px;letter-spacing:-.055em;}
+  .consumer-header h1::before {width:30px;height:30px;font-size:15px;margin-right:6px;}
+  .menu-toggle {width:36px;height:36px;font-size:20px;}
+  .consumer-header-spacer {width:36px;min-width:36px;}
+  .consumer-menu {top:61px;}
+  .booking-sticky-stack {top:62px !important;}
+  .booking-controls {gap:7px;padding:9px;border-radius:0 0 16px 16px;}
+  .booking-topbar {padding:6px 10px;border-radius:0 0 16px 16px;}
+  .consumer-content {padding-inline:10px;}
+  .consumer-placeholder.profile-page {margin:8px auto;padding:18px 16px;}
+  .profile-hero h2 {font-size:clamp(25px,6vw,34px);}
+  .my-orders-page {padding-inline:12px;}
+  .my-order-card {padding:16px;flex-wrap:wrap;}
+  .host-dashboard {padding:20px 8px;}
+  .station-details-page {padding-inline:0;}
+  .station-details-summary {padding:16px;}
+  .station-details-sticky-top {top:62px;padding:10px 8px;}
+  .consumer-bottom-nav {bottom:8px;}
+}
+@media (max-width: 380px) {
+  .consumer-header h1 {font-size:16px;}
+  .consumer-header h1::before {width:26px;height:26px;}
+  .booking-controls {grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+  .booking-control select {min-width:0;width:100%;}
+  .booking-topbar-item {gap:6px;}
+  .booking-topbar-text strong {font-size:12px;}
+  .profile-hero {gap:10px;}
+  .profile-photo-wrap {width:60px;height:60px;}
+  .cancel-dialog-actions {flex-wrap:wrap;}
+}
+
+/* Contrast corrections for the legacy OTP flow: lime is a fill, not tiny body text. */
+.signup-form > .signup-field > button:not(.signup-button),
+.signup-field label > span:not(.signup-optional),
+.signup-page .back-button,.signup-page .signup-remove-contact,
+.signup-page .signup-feedback-actions .back-button {
+  color:var(--ev-ink) !important;
+}
+.signup-form > .signup-field > button:not(.signup-button) {
+  background:var(--ev-soft) !important;padding:9px 14px !important;
+  border-radius:var(--ev-radius-pill);text-align:left;
+}
+.signup-form > .signup-field > button:not(.signup-button):hover {background:var(--ev-lime) !important;}
+.signup-page .back-button {background:var(--ev-mist);border-radius:var(--ev-radius-pill);}
+.app .card h2 {color:var(--ev-ink);}
+
+/* Responsive booking controls: replace the old forced four-column grid on phones.
+   Every date/SoC/filter label remains visible and touch targets remain usable. */
+@media (max-width: 800px) {
+  .booking-topbar[style] {display:grid !important;grid-template-columns:minmax(0,1fr) !important;}
+  .booking-topbar-item[style] {padding:12px 6px !important;min-height:70px;gap:12px !important;}
+  .booking-topbar-address[style] {border-right:0 !important;border-bottom:1px solid var(--ev-soft) !important;}
+  .booking-topbar-text {min-width:0;}
+  .booking-topbar-text strong {white-space:normal !important;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  .booking-topbar-text em {white-space:normal;overflow-wrap:anywhere;}
+  .booking-controls {grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:12px !important;padding:13px !important;}
+  .booking-date-control {grid-column:1/-1 !important;}
+  .booking-filter-control {grid-column:1/-1 !important;}
+  .booking-control > span {white-space:normal !important;min-height:16px;}
+  .booking-control select,.booking-control input[type='date'] {font-size:14px;}
+  .booking-filter-chip {min-height:43px;}
+}
+@media (max-width: 390px) {
+  .booking-filter-chip {font-size:10px !important;padding:7px 3px !important;}
+  .booking-filter-options {gap:4px !important;}
+}
+.consumer-shell.profile-shell .consumer-header h1,
+.consumer-shell.book-shell .consumer-header h1,
+.profile-hero h2 {color:var(--ev-ink) !important;}
+.profile-item-actions .back-button {background:var(--ev-soft) !important;
+  color:var(--ev-ink) !important;border:1px solid var(--ev-soft) !important;
+  min-height:42px;border-radius:var(--ev-radius-pill);font-weight:750;}
+.profile-item-actions .back-button:last-child:not(:first-child) {
+  background:var(--ev-charcoal) !important;color:var(--ev-white) !important;
+  border-color:var(--ev-charcoal) !important;
+}
+.host-dashboard .consumer-back,.host-dashboard button.consumer-back {
+  background:var(--ev-soft) !important;color:var(--ev-ink) !important;
+  border:1px solid var(--ev-soft) !important;
+}
+.host-station-card {text-align:left;}
+.host-station-card h4 {color:var(--ev-ink);font-size:20px;letter-spacing:-.03em;margin:0 0 12px;}
+.host-station-card-details p {margin:9px 0;font-size:14px;line-height:1.5;}
+.host-station-card-details strong {color:var(--ev-ink);}
+
+/* Remove the old bright mint photo overlays: their pale backgrounds were making
+   the reference's white-on-black station details unreadable on mobile. */
+.station-details-summary {
+  background:var(--ev-ink) !important;
+  border:1px solid var(--ev-charcoal) !important;
+}
+.station-details-summary::before,.station-details-summary::after {
+  display:none !important;
+  content:none !important;
+}
+.station-details-summary .station-details-fact,
+.station-details-summary .station-detail-item {background:transparent;color:var(--ev-white);}
+.station-details-summary :is(.station-type-item strong,.station-type-item small,
+  .station-details-metric small,.station-details-fact strong,.station-details-fact small) {
+  color:var(--ev-white) !important;
+}
+.signup-back-link,.signup-back-link:hover,
+.signup-message,.signup-feedback p,.signup-countdown,.signup-countdown.is-expired,
+.otp-countdown {color:var(--ev-ink) !important;}
+.signup-back-link {background:var(--ev-mist);border-radius:var(--ev-radius-pill);}
+.signup-back-link:hover {background:var(--ev-lime);text-decoration:none;}
+.signup-message,.signup-feedback,.signup-countdown {background:var(--ev-mist);border-color:var(--ev-soft);border-radius:14px;}
+.signup-button-secondary {color:var(--ev-ink);background:var(--ev-soft);}
+
+.station-details-slot-heading > span {color:var(--ev-ink) !important;
+  background:var(--ev-lime);border-radius:var(--ev-radius-pill);padding:6px 12px;}
+.profile-photo-edit:focus-within {outline:3px solid var(--ev-ink);outline-offset:3px;}
+
+/* Monochrome pictograms replace multicolor legacy emoji to keep the screenshot
+   palette intact. SVGs are embedded; no font or icon dependency is required. */
+.consumer-header h1::before {content:'';background-image:var(--ev-icon-bolt);
+  background-repeat:no-repeat;background-position:center;background-size:21px;}
+.booking-topbar-icon {font-size:0 !important;background-image:var(--ev-icon-pin);
+  background-repeat:no-repeat;background-position:center;background-size:21px;}
+.booking-topbar-battery .booking-topbar-icon {background-image:var(--ev-icon-battery);}
+.bottom-nav-default-avatar,.profile-photo-default {font-size:0 !important;}
+.bottom-nav-default-avatar::after,.profile-photo-default::after {content:'';
+  display:block;width:65%;height:65%;background-image:var(--ev-icon-car);
+  background-repeat:no-repeat;background-size:contain;background-position:center;}
+.consumer-bottom-nav button:first-child > span:first-child {font-size:0 !important;
+  display:block;width:25px;height:25px;background-image:var(--ev-icon-plug);
+  background-repeat:no-repeat;background-size:contain;background-position:center;}

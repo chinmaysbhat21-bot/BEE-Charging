@@ -1,0 +1,60 @@
+/* Shared reference design system — extracted from the supplied screenshots. */
+:root {
+  color-scheme: light;
+  --ev-lime: #C7FE2F;
+  --ev-icon-bolt: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%23090708%22%20d%3D%22M13%201%204%2013h7l-1%2010%2010-14h-7z%22%2F%3E%3C%2Fsvg%3E");
+  --ev-icon-plug: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23090708%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M8%202v6M16%202v6M5%208h14v4a7%207%200%200%201-6%206.9V22M11%2018.9A7%207%200%200%201%205%2012V8%22%2F%3E%3C%2Fsvg%3E");
+  --ev-icon-car: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23090708%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%2016h14l-1.5-7H6.5L5%2016ZM3%2016v3h3m12%200h3v-3M8%209l1-3h6l1%203%22%2F%3E%3Ccircle%20cx%3D%228%22%20cy%3D%2217%22%20r%3D%221.25%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2217%22%20r%3D%221.25%22%2F%3E%3C%2Fsvg%3E");
+  --ev-icon-pin: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23090708%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M19%2010c0%205-7%2012-7%2012S5%2015%205%2010a7%207%200%200%201%2014%200Z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2210%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E");
+  --ev-icon-battery: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23090708%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%224%22%20y%3D%225%22%20width%3D%2216%22%20height%3D%2215%22%20rx%3D%223%22%2F%3E%3Cpath%20d%3D%22M10%203h4M13%208l-4%205h4l-2%205%22%2F%3E%3C%2Fsvg%3E");
+
+  --ev-ink: #090708;
+  --ev-charcoal: #1A1A1A;
+  --ev-white: #FFFFFF;
+  --ev-mist: #F4F4F4;
+  --ev-soft: #EDEDED;
+  --ev-line: #CBCBCB;
+  --ev-muted: #676767;
+  --ev-radius-xl: 28px;
+  --ev-radius-card: 22px;
+  --ev-radius-pill: 999px;
+  --ev-shadow: 0 18px 48px rgba(0, 0, 0, .11);
+  --text: var(--ev-muted);
+  --text-h: var(--ev-ink);
+  --bg: var(--ev-white);
+  --border: var(--ev-soft);
+  --accent: var(--ev-lime);
+  --accent-bg: var(--ev-lime);
+  --accent-border: var(--ev-lime);
+  --sans: 'Arial', 'Helvetica Neue', system-ui, sans-serif;
+  --heading: 'Arial', 'Helvetica Neue', system-ui, sans-serif;
+  font: 16px/1.45 var(--sans);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background: var(--ev-ink);
+  color: var(--ev-ink);
+}
+*, *::before, *::after {box-sizing: border-box;}
+html { min-width: 320px; scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: var(--ev-ink); color: var(--ev-ink); }
+#root { max-width: none; width: 100%; min-height: 100svh; margin: 0; border: 0; text-align: initial; }
+h1,h2,h3,h4,h5 { color: var(--ev-ink); font-family: var(--heading); letter-spacing: -.055em; line-height: 1.08; }
+h1 { font-weight: 750; }
+h2,h3,h4 { font-weight: 730; }
+button,input,select,textarea { font: inherit; }
+button { touch-action: manipulation; }
+button:not(:disabled) { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .48; transform: none !important; }
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--ev-lime) !important;
+  outline-offset: 3px;
+}
+:where(input, select, textarea) {
+  accent-color: var(--ev-ink);
+  color: var(--ev-ink);
+}
+::selection { background: var(--ev-lime); color: var(--ev-ink); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
