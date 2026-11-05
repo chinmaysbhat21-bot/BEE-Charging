@@ -1,0 +1,94 @@
+/* Final, shared fit and finish for the BEE Charging experience. */
+:root {
+  --ev-lime: #c8f24a;
+  --ev-mist: #f5f7f3;
+  --ev-soft: #e7ebe4;
+  --ev-line: #d5dbd2;
+  --ev-muted: #657067;
+  --ev-shadow: 0 10px 30px rgba(25, 35, 27, .06);
+}
+
+body { background: #f1f3ee; }
+.consumer-shell {
+  overflow: clip;
+  box-shadow: 0 12px 50px rgba(28, 37, 29, .07);
+}
+.consumer-header {
+  border-bottom-color: #e9ede7;
+  box-shadow: 0 4px 14px rgba(25, 35, 27, .025);
+}
+.primary-navigation button.active {
+  border-color: #e7ebe4;
+  background: #f5f7f3;
+}
+.menu-toggle { border: 1px solid #edf0eb; }
+.menu-toggle:hover { border-color: var(--ev-lime); }
+
+/* Keep the search panel tucked neatly below the sticky app header. */
+.booking-sticky-stack {
+  top: 76px !important;
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 8px 18px rgba(25, 35, 27, .045);
+}
+.booking-topbar {
+  border-color: var(--ev-soft);
+}
+.booking-controls {
+  border-color: var(--ev-soft);
+  background: #f6f7f4;
+}
+.booking-filter-chip {
+  min-height: 42px;
+  padding-inline: 13px;
+  border-radius: 999px;
+}
+.booking-results-scroll { padding-top: 8px; }
+.booking-results-toolbar {
+  min-height: 48px;
+  border-bottom-color: transparent;
+}
+.charging-station-card {
+  border-color: #e7ebe4;
+  border-radius: 18px;
+  box-shadow: 0 3px 12px rgba(25, 35, 27, .035);
+}
+.charging-station-card:hover {
+  border-color: #cbd4c4;
+  box-shadow: 0 10px 24px rgba(25, 35, 27, .075);
+}
+.charging-station-card-description h3 { letter-spacing: -.025em; }
+.charging-station-card-address { overflow-wrap: anywhere; }
+.charging-station-card-facts span { line-height: 1.45; }
+.charging-station-view-details,
+.station-details-book-button,
+.button-primary,
+.signup-button:not(.button-secondary) {
+  box-shadow: 0 3px 0 rgba(9, 7, 8, .06);
+}
+
+:where(.profile-item-card,.consumer-info,.profile-contact-info,.host-station-card,
+  .host-dashboard .host-station-item,.my-order-card,.history-order-card,
+  .station-details-card,.station-details-slot-section) {
+  border-color: var(--ev-soft);
+  box-shadow: 0 3px 14px rgba(25, 35, 27, .035);
+}
+:where(.profile-item-card,.my-order-card,.history-order-card) { border-radius: 18px; }
+:where(.profile-list-section,.host-dashboard-section) + :where(.profile-list-section,.host-dashboard-section) {
+  margin-top: 22px;
+}
+
+@media (max-width: 800px) {
+  body { background: #fff; }
+  .booking-sticky-stack { top: 62px !important; }
+  .booking-results-scroll { padding-top: 6px; }
+  .booking-controls { border-radius: 0 0 16px 16px; }
+  .charging-station-card { border-radius: 16px; }
+  .consumer-header { box-shadow: 0 3px 10px rgba(25, 35, 27, .035); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .primary-navigation button,
+  .menu-toggle,
+  .charging-station-view-details,
+  .button-primary { transition-duration: .16s; }
+}
