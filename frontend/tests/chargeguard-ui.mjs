@@ -55,8 +55,16 @@ try {
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow()
   await page.screenshot({ path: 'test-results/chargeguard/consumer-mobile.png', fullPage: true })
+  const refreshed = page.waitForResponse(response => response.url().endsWith('/api/charging-stations') && response.ok())
   await page.getByRole('button', { name: 'Submit report', exact: true }).click()
   await expect(page.getByText('Your reservation may be at risk.')).toBeVisible()
+  const { stations } = await (await refreshed).json()
+  const reportedStation = stations.find(station => station.stationCode === 'UI-TEST')
+  if (dockMode) {
+    expect(reportedStation.chargers.map(point => point.chargeGuard.state)).toEqual(['ACTIVE', 'ACTIVE', 'PAUSED', 'ACTIVE', 'ACTIVE'])
+  } else {
+    expect(reportedStation.chargeGuard.state).toBe('PAUSED')
+  }
   await page.reload()
   await menu('My Orders')
   await expect(page.getByText('Your reservation may be at risk.')).toBeVisible()

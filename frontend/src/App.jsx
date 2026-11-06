@@ -768,27 +768,48 @@ function App() {
 
   useEffect(() => {
     if (!loginComplete) return undefined
-    let cancelled = false
-    const loadChargingStations = async () => {
-      setStationsLoading(true)
-      setStationsError('')
+    const controller = new AbortController()
+    let requestNumber = 0
+    const loadChargingStations = async (quiet = false) => {
+      const currentRequest = ++requestNumber
+      const isCurrent = () => !controller.signal.aborted && currentRequest === requestNumber
+      if (!quiet) {
+        setStationsLoading(true)
+        setStationsError('')
+      }
       try {
         const response = await fetch('/api/charging-stations', {
           credentials: 'include',
+          cache: 'no-store',
+          signal: controller.signal,
         })
         const data = await response.json().catch(() => ({}))
         if (!response.ok || data.success === false) throw new Error(data.message || 'Could not load charging stations.')
-        if (!cancelled) setChargingStations(Array.isArray(data.stations) ? data.stations : [])
+        if (isCurrent()) {
+          setChargingStations(Array.isArray(data.stations) ? data.stations : [])
+          setStationsError('')
+        }
       } catch (error) {
-        console.error('Charging stations load failed:', error)
-        if (!cancelled) setStationsError('Could not load charging stations. Check that the backend is running and try again.')
+        if (isCurrent() && !quiet) setStationsError('Could not load charging stations. Check that the backend is running and try again.')
       } finally {
-        if (!cancelled) setStationsLoading(false)
+        if (isCurrent()) setStationsLoading(false)
       }
     }
     loadChargingStations()
-    return () => { cancelled = true }
-  }, [loginComplete])
+    const refreshAvailability = () => loadChargingStations(true)
+    window.addEventListener('chargeguard-report', refreshAvailability)
+    window.addEventListener('chargeguard-resolved', refreshAvailability)
+    const viewingStations = activeSection === 'main' && activeTab === 'book'
+    const poll = viewingStations ? setInterval(refreshAvailability, 30000) : null
+    if (viewingStations) window.addEventListener('focus', refreshAvailability)
+    return () => {
+      controller.abort()
+      clearInterval(poll)
+      window.removeEventListener('focus', refreshAvailability)
+      window.removeEventListener('chargeguard-report', refreshAvailability)
+      window.removeEventListener('chargeguard-resolved', refreshAvailability)
+    }
+  }, [loginComplete, activeSection, activeTab])
 
   // The host screen must show the signed-in owner's stations, not every
   // publicly available charger. This uses the existing authenticated endpoint.
@@ -808,7 +829,15 @@ function App() {
   }
 
   useEffect(() => {
-    if (loginComplete && activeSection === 'host') fetchHostedStations()
+    if (!loginComplete || activeSection !== 'host') return
+    fetchHostedStations()
+    const refreshHealth = () => fetchHostedStations(true)
+    const poll = setInterval(refreshHealth, 30000)
+    window.addEventListener('chargeguard-resolved', refreshHealth)
+    return () => {
+      clearInterval(poll)
+      window.removeEventListener('chargeguard-resolved', refreshHealth)
+    }
   }, [loginComplete, activeSection])
 
   // Saved profile addresses are text-based, so geocode them before calculating
@@ -3406,7 +3435,8 @@ function App() {
                                 <div className="station-time-slot-list" style={{ display: 'grid', gap: '12px' }}>
                                   {availableSlotWindows.map((slot) => {
                                     const stationKey = String(station._id || station.stationCode)
-                                    const hasSelection = selectedTimeSlot?.stationId === stationKey
+                                    const hasSelection = selectedTimeSlot?.stationId === stationKey &&
+                                      (!parentStation.pointBookingEnabled || String(selectedTimeSlot.chargingPointId) === String(selectedPoint?._id))
                                     const isSelectedWindow = hasSelection && selectedTimeSlot?.windowId === slot.id
                                     const toMinutes = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
                                     const toTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
