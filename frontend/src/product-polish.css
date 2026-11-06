@@ -286,3 +286,102 @@ html { scroll-padding-block: 88px 104px; }
   .booking-filter-chip { flex:1 1 100%; justify-content:flex-start; }
   .wallet-stats,.network-options { grid-template-columns:minmax(0,1fr); }
 }
+
+/* Keep station facts and booking estimates aligned within the summary. */
+.station-details-summary .station-details-summary-main {
+  min-width: 0;
+}
+
+.station-details-summary .station-details-summary-main > h2 {
+  margin: 0 0 6px;
+}
+
+.station-details-summary .station-details-summary-main > p:not(.station-details-address) {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: .82;
+}
+
+.station-details-summary .station-details-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.station-details-summary .station-details-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.station-details-summary :is(.station-details-fact, .station-type-item) {
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+}
+
+.station-details-summary :is(.station-details-fact-icon, .station-type-item .station-detail-icon) {
+  flex: 0 0 22px;
+  width: 22px;
+  min-width: 22px;
+  font-size: 16px;
+}
+
+.station-details-summary :is(.station-details-fact, .station-type-item, .station-details-metric) strong {
+  overflow-wrap: anywhere;
+}
+
+.station-details-summary :is(.station-details-fact, .station-type-item, .station-details-metric) small {
+  opacity: .78;
+}
+
+.station-details-summary .station-details-price-block {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, .2);
+  text-align: left;
+}
+
+.station-details-summary .station-details-metric {
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.station-details-summary .station-details-metric strong {
+  font-size: clamp(18px, 5vw, 24px);
+  line-height: 1.2;
+}
+
+.order-lifecycle-section + .order-lifecycle-section { margin-top: 24px; }
+.order-lifecycle-section > h3 { margin: 0 0 12px; }
+.order-lifecycle-section .my-order-details h3 { margin-top: 0; }
+.order-lifecycle-section .order-lifecycle-status {
+  display: inline-block;
+  margin: 6px 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--ev-soft);
+  color: var(--ev-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.order-lifecycle-section .order-lifecycle-status[data-state=current] { background: var(--ev-lime); }
+.order-lifecycle-section .order-details-link {
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ev-ink);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

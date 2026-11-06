@@ -45,7 +45,8 @@ try {
   }
   await login('driver@example.test')
   await menu('My Orders')
-  await page.getByRole('button', { name: 'Report Charging Issue' }).click()
+  const activeOrder = page.locator('.my-order-card').filter({ has: page.getByText('Current order', { exact: true }) })
+  await activeOrder.getByRole('button', { name: 'Report Charging Issue' }).click()
   await expect(page.getByLabel('Issue type')).toBeFocused()
   if (dockMode) await expect(page.locator('.cg-form').getByText(/Dock 3/)).toBeVisible()
   await page.getByLabel('Issue type').selectOption('charger_malfunction')
@@ -57,7 +58,7 @@ try {
   await page.screenshot({ path: 'test-results/chargeguard/consumer-mobile.png', fullPage: true })
   const refreshed = page.waitForResponse(response => response.url().endsWith('/api/charging-stations') && response.ok())
   await page.getByRole('button', { name: 'Submit report', exact: true }).click()
-  await expect(page.getByText('Your reservation may be at risk.')).toBeVisible()
+  await expect(activeOrder.getByText('Your reservation may be at risk.')).toBeVisible()
   const { stations } = await (await refreshed).json()
   const reportedStation = stations.find(station => station.stationCode === 'UI-TEST')
   if (dockMode) {
@@ -67,7 +68,7 @@ try {
   }
   await page.reload()
   await menu('My Orders')
-  await expect(page.getByText('Your reservation may be at risk.')).toBeVisible()
+  await expect(activeOrder.getByText('Your reservation may be at risk.')).toBeVisible()
   await menu('History')
   await page.getByRole('button', { name: 'Report Charging Issue' }).click()
   await expect(page.getByLabel('Issue type')).toBeVisible()

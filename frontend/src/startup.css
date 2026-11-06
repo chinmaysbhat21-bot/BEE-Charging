@@ -1,0 +1,45 @@
+.bee-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  background: var(--ev-white, #fff);
+  pointer-events: none;
+  animation: bee-opening-exit 200ms 1600ms ease-out both;
+}
+.bee-opening-lockup { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.bee-opening-mark { position: relative; width: 64px; height: 64px; }
+.bee-opening-container {
+  position: absolute; inset: 0; border-radius: 21px;
+  background: var(--ev-lime, #C7FE2F);
+  animation: bee-opening-form 350ms 550ms cubic-bezier(.22,1,.36,1) both;
+}
+.bee-opening-spark {
+  position: absolute; width: 4px; height: 4px; left: 30px; top: 30px;
+  border-radius: 50%; background: var(--ev-lime, #C7FE2F);
+  animation: bee-opening-spark 250ms ease-out both;
+}
+.bee-opening-bolt {
+  position: absolute; inset: 15px;
+  background: var(--ev-icon-bolt) center / contain no-repeat;
+  animation: bee-opening-reveal 350ms 250ms cubic-bezier(.22,1,.36,1) both,
+    bee-opening-pulse 250ms 1250ms ease-in-out;
+}
+.bee-opening-name {
+  font-family: var(--heading, Arial, sans-serif); font-weight: 750;
+  font-size: 28px; line-height: 1.08; letter-spacing: -.055em;
+  color: var(--ev-ink, #090708);
+  animation: bee-opening-name 300ms 900ms cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes bee-opening-spark { 0% { opacity: 0; transform: scale(.5); } 50% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+@keyframes bee-opening-reveal { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+@keyframes bee-opening-form { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes bee-opening-name { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes bee-opening-pulse { 50% { opacity: .65; } }
+@keyframes bee-opening-exit { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .bee-opening { animation: bee-opening-exit 100ms 150ms both; }
+  .bee-opening-container, .bee-opening-bolt, .bee-opening-name { animation: none; }
+  .bee-opening-spark { display: none; }
+}

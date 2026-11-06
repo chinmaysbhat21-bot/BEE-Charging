@@ -1,7 +1,7 @@
 import { AmenitiesPicker, StationAmenities } from './Components/StationAmenities'
 import ChargerMap from './Components/ChargerMap'
 import { newChargingPoint } from './data/chargingPointDefaults'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import './App.css'
 import './reference-tokens.css'
 import './reference-theme.css'
@@ -387,6 +387,23 @@ function NavigationIcon({ name }) {
   return <svg className="primary-nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
+function orderSchedule(booking) {
+  const start = Date.parse(booking.startAt)
+  const end = Date.parse(booking.endAt)
+  const wallStart = booking.date + 'T' + booking.startTime + ':00'
+  const wallEnd = booking.date + 'T' + booking.endTime + ':00'
+  // Match ChargeGuard's interpretation of hosted bookings recorded in UTC.
+  return start === Date.parse(wallStart + 'Z') && end === Date.parse(wallEnd + 'Z')
+    ? { start: Date.parse(wallStart + '+05:30'), end: Date.parse(wallEnd + '+05:30') }
+    : { start, end }
+}
+
+const orderGroups = [
+  { id: 'upcoming', title: 'Upcoming Orders', empty: 'No upcoming reservations.' },
+  { id: 'current', title: 'Current Orders', empty: 'No current reservations.' },
+  { id: 'completed', title: 'Completed Orders', empty: 'No confirmed completions yet.' },
+]
+
 function App() {
   const [myBookings, setMyBookings] = useState([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
@@ -396,6 +413,7 @@ function App() {
   const [previousPage, setPreviousPage] = useState('home')
   const [loginStartedFromSignup, setLoginStartedFromSignup] = useState(false)
   const [expandedOrderIds, setExpandedOrderIds] = useState([])
+  const [orderNow, setOrderNow] = useState(Date.now)
   const [signupDraft, setSignupDraft] = useState({ ...emptySignupForm })
   const [loginForm, setLoginForm] = useState({ ...emptyLoginForm })
 
@@ -470,6 +488,13 @@ function App() {
   })
   const [editingNameField, setEditingNameField] = useState(null)
   const [nameDraft, setNameDraft] = useState('')
+  const nameSaveQueue = useRef(Promise.resolve(null))
+  const nameAccountId = loggedInConsumer?._id || loggedInConsumer?.id
+  const activeNameAccount = useRef(nameAccountId)
+  useEffect(() => {
+    activeNameAccount.current = nameAccountId
+    nameSaveQueue.current = Promise.resolve(null)
+  }, [nameAccountId])
   const [photoSaving, setPhotoSaving] = useState(false)
 
   const [savedAddresses, setSavedAddresses] = useState([])
@@ -710,12 +735,16 @@ function App() {
     fetchMyBookings()
     const refreshBookings = () => fetchMyBookings(true)
     const poll = setInterval(refreshBookings, 30000)
+    window.addEventListener('focus', refreshBookings)
+    window.addEventListener('online', refreshBookings)
     window.addEventListener('chargeguard-report', refreshBookings)
 
     return () => {
       cancelled = true
       clearInterval(poll)
       window.removeEventListener('chargeguard-report', refreshBookings)
+      window.removeEventListener('focus', refreshBookings)
+      window.removeEventListener('online', refreshBookings)
     }
   }, [activeSection])
 
@@ -1070,36 +1099,53 @@ function App() {
     }
   }
 
-  const handleSaveName = async (event, field) => {
-    event?.preventDefault()
-    const nextForm = { ...profileForm, [field]: nameDraft.trim() }
-    if (!nextForm.firstName.trim() || !nextForm.lastName.trim()) return
-    try {
-      const { ok, data } = await profileApiRequest('/profile', {
-        method: 'PUT',
-        body: JSON.stringify({
-          firstName: nextForm.firstName.trim(),
-          middleName: nextForm.middleName.trim(),
-          lastName: nextForm.lastName.trim(),
-        }),
-      })
-      if (!ok) {
-        setProfileMessage(data.message || 'Could not save this name.')
-        return
-      }
-      setLoggedInConsumer(data.consumer)
-      setProfileForm({
-        firstName: data.consumer.firstName || '',
-        middleName: data.consumer.middleName || '',
-        lastName: data.consumer.lastName || '',
-      })
-      setEditingNameField(null)
-      setNameDraft('')
-      setProfileMessage('')
-    } catch (error) {
-      console.error('Save name failed:', error)
-      setProfileMessage('Could not connect to the backend to save this name.')
+  useEffect(() => {
+    if (activeSection !== 'orders') return
+    const update = () => setOrderNow(Date.now())
+    update()
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [activeSection])
+
+  const handleSaveName = (field, value, required) => {
+    setEditingNameField(null)
+    setNameDraft('')
+    const name = value.trim()
+    if (name === profileForm[field]) return
+    if (required && !name) {
+      setProfileMessage('First and last names are required.')
+      return
     }
+
+    setProfileForm(current => ({ ...current, [field]: name }))
+    // The profile endpoint accepts all three names. Queue field edits so a
+    // quick move to another field cannot overwrite a save already in flight.
+    const save = nameSaveQueue.current.then(async previous => {
+      if (activeNameAccount.current !== nameAccountId) return null
+      const saved = previous || profileForm
+      const nextForm = { ...saved, [field]: name }
+      try {
+        const { ok, data } = await profileApiRequest('/profile', {
+          method: 'PUT',
+          body: JSON.stringify(nextForm),
+        })
+        if (!ok) throw new Error(data.message || 'Could not save this name.')
+        if (activeNameAccount.current !== nameAccountId) return null
+        setProfileMessage('')
+        return nextForm
+      } catch (error) {
+        if (activeNameAccount.current !== nameAccountId) return null
+        setProfileForm(current => current[field] === name ? { ...current, [field]: saved[field] } : current)
+        setProfileMessage(error.message || 'Could not save this name.')
+        return saved
+      }
+    })
+    nameSaveQueue.current = save
+    void save.then(saved => {
+      if (saved && nameSaveQueue.current === save && activeNameAccount.current === nameAccountId) {
+        setLoggedInConsumer(current => ({ ...current, ...saved }))
+      }
+    })
   }
 
   const handleSaveProfilePhoto = async (event) => {
@@ -1969,44 +2015,48 @@ function App() {
                 <p className="my-orders-message">Loading your bookings...</p>
               ) : bookingsError ? (
                 <p className="booking-error">{bookingsError}</p>
-              ) : myBookings.filter(
-                (booking) =>
-                  booking.status === 'confirmed' &&
-                  new Date(booking.endAt) > new Date()
-              ).length === 0 ? (
-                <div className="orders-empty-state">
-                  <NavigationIcon name="orders" />
-                  <h3>No upcoming charging reservations</h3>
-                  <p>Once you book a charging session, its status and details will appear here.</p>
-                  <button type="button" className="button button-primary" onClick={() => { setActiveSection('main'); setActiveTab('book') }}>Find a Charging Station</button>
-                </div>
               ) : (
-                <div className="my-orders-list">
-                  {myBookings
-                    .filter(
-                      (booking) =>
-                        booking.status === 'confirmed' &&
-                        new Date(booking.endAt) > new Date()
-                    )
-                    .map((booking) => {
-                      const formatTime = (time) => {
-                        const [hours, minutes] = time.split(':').map(Number)
-                        const suffix = hours >= 12 ? 'P.M' : 'A.M'
-                        const displayHour = hours % 12 || 12
-
-                        return `${displayHour}:${String(minutes).padStart(2, '0')} ${suffix}`
-                      }
-
-                      const bookingStart = new Date(booking.startAt)
-                      const cancellationDeadline =
-                        bookingStart.getTime() - 60 * 60 * 1000
-                      const canCancel = Date.now() < cancellationDeadline
+                orderGroups.map(group => {
+                  const orders = myBookings.filter(booking => {
+                    if (booking.status !== 'confirmed' || booking.sessionOutcome === 'failed') return false
+                    if (booking.sessionOutcome === 'completed') return group.id === 'completed'
+                    return group.id === (orderSchedule(booking).start > orderNow ? 'upcoming' : 'current')
+                  })
+                  if (group.id === 'completed') orders.sort((a, b) => Date.parse(b.completedAt || b.endAt) - Date.parse(a.completedAt || a.endAt))
+                  return <section className="order-lifecycle-section" key={group.id} aria-labelledby={'orders-' + group.id}>
+                    <h3 id={'orders-' + group.id}>{group.title}</h3>
+                    {orders.length === 0 ? <p className="my-orders-message">{group.empty}</p> : (
+                    <div className="my-orders-list">
+                    {orders.map(booking => {
+                      const completed = group.id === 'completed'
+                      const awaitingOutcome = group.id === 'current' && orderSchedule(booking).end <= orderNow
+                      const canCancel = group.id === 'upcoming' && orderNow < Date.parse(booking.startAt) - 60 * 60 * 1000
 
                       return (
                         <article className="my-order-card" key={booking._id}>
+                          <div className="my-order-details">
+                            <h3>{booking.station?.name || 'Charging Station'}</h3>
+                            <p className="order-lifecycle-status" data-state={group.id}>{completed ? 'Order completed' : awaitingOutcome ? 'Awaiting completion confirmation' : group.id === 'upcoming' ? 'Upcoming' : 'Current order'}</p>
+                            {completed && booking.completedAt && <p>Completed {new Date(booking.completedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</p>}
+                            {booking.chargingPointName && <p>Charging point: {booking.chargingPointName}{booking.pricePerKWh != null ? ` · ₹${booking.pricePerKWh}/kWh` : ''}</p>}
+                            <BookingPayment booking={booking} />
+                            <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
+
+                            <p>
+                              {new Date(`${booking.date}T00:00:00`).toLocaleDateString(
+                                'en-GB',
+                                {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                }
+                              )}
+                              {`, ${formatClockTime(booking.startTime)} to ${formatClockTime(booking.endTime)}, ${booking.durationMinutes} minutes`}
+                            </p>
+
                           <button
                             type="button"
-                            className="order-details-toggle"
+                            className="order-details-link"
                             aria-expanded={expandedOrderIds.includes(booking._id)}
                             aria-label={
                               expandedOrderIds.includes(booking._id)
@@ -2021,26 +2071,8 @@ function App() {
                               )
                             }}
                           >
-                            {expandedOrderIds.includes(booking._id) ? '▲' : '▼'}
+                            {expandedOrderIds.includes(booking._id) ? 'Hide details' : 'View details'}
                           </button>
-
-                          <div className="my-order-details">
-                            <h3>{booking.station?.name || 'Charging Station'}</h3>
-                            {booking.chargingPointName && <p>Charging point: {booking.chargingPointName}{booking.pricePerKWh != null ? ` · ₹${booking.pricePerKWh}/kWh` : ''}</p>}
-                            <BookingPayment booking={booking} />
-                            <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
-
-                            <p>
-                              {new Date(`${booking.date}T00:00:00`).toLocaleDateString(
-                                'en-GB',
-                                {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                }
-                              )}
-                              {`, ${formatTime(booking.startTime)} to ${formatTime(booking.endTime)}, ${booking.durationMinutes} minutes`}
-                            </p>
 
                             {expandedOrderIds.includes(booking._id) && (
                               <div className="order-extra-details">
@@ -2067,6 +2099,7 @@ function App() {
                             )}
                           </div>
 
+                          {group.id === 'upcoming' &&
                           <button
                             type="button"
                             className="cancel-booking-button"
@@ -2082,7 +2115,7 @@ function App() {
                             }}
                           >
                             Cancel
-                          </button>
+                          </button>}
 
                           <button
                             type="button"
@@ -2162,6 +2195,9 @@ function App() {
                       )
                     })}
                 </div>
+                    )}
+                  </section>
+                })
               )}
 
               <nav className="my-orders-bottom-nav">
@@ -2190,7 +2226,7 @@ function App() {
               <h2 className="my-orders-title">Booking History</h2>
 
               <p className="history-subtitle">
-                Your completed and cancelled charging reservations
+                Past charging reservations and their recorded outcomes
               </p>
 
               {bookingsLoading ? (
@@ -2205,12 +2241,11 @@ function App() {
 
                   const historyBookings = myBookings
                     .filter((booking) => {
-                      if (booking.status === 'cancelled') return true
+                      if (booking.status === 'cancelled' || ['completed', 'failed'].includes(booking.sessionOutcome)) return true
 
                       return (
                         booking.status === 'confirmed' &&
-                        booking.endAt &&
-                        new Date(booking.endAt) <= now
+                        orderSchedule(booking).end <= now.getTime()
                       )
                     })
                     .sort(
@@ -2224,8 +2259,7 @@ function App() {
                       <div className="history-empty">
                         <h3>No booking history yet</h3>
                         <p>
-                          Your completed and cancelled reservations will
-                          appear here.
+                          Past reservations will appear here.
                         </p>
                       </div>
                     )
@@ -2341,10 +2375,10 @@ function App() {
                             <span
                               className={`history-status ${isCancelled
                                 ? 'history-status-cancelled'
-                                : 'history-status-completed'
+                                : booking.sessionOutcome === 'completed' ? 'history-status-completed' : ''
                                 }`}
                             >
-                              {isCancelled ? 'Cancelled' : 'Completed'}
+                              {isCancelled ? 'Cancelled' : booking.sessionOutcome === 'completed' ? 'Completed' : booking.sessionOutcome === 'failed' ? 'Failed' : 'Awaiting confirmation'}
                             </span>
                           </article>
                         )
@@ -2609,13 +2643,6 @@ function App() {
                       </label>
 
                       <div>
-                        <button
-                          type="button"
-                          onClick={resolveHostCoordinates}
-                          disabled={hostCoordinatesLoading}
-                        >
-                          {hostCoordinatesLoading === 'address' ? 'Finding Coordinates...' : 'Find Coordinates'}
-                        </button>
                         <button type="button" onClick={useHostCurrentLocation} disabled={Boolean(hostCoordinatesLoading)}>
                           {hostCoordinatesLoading === 'device' ? 'Getting Current Location...' : 'Use Current Location'}
                         </button>
@@ -2833,31 +2860,17 @@ function App() {
                         value={editingNameField === field ? nameDraft : profileForm[field]}
                         readOnly={editingNameField !== field}
                         required={required}
+                        onFocus={() => {
+                          if (editingNameField === field) return
+                          setEditingNameField(field)
+                          setNameDraft(profileForm[field] || '')
+                        }}
                         onChange={(event) => setNameDraft(event.target.value)}
+                        onBlur={(event) => handleSaveName(field, event.currentTarget.value, required)}
                         onKeyDown={(event) => {
-                          if (event.key === 'Escape') {
-                            setEditingNameField(null)
-                            setNameDraft('')
-                          }
+                          if (event.key === 'Enter') event.currentTarget.blur()
                         }}
                       />
-                      {editingNameField !== field ? (
-                        <button
-                          type="button"
-                          className="icon-edit-button"
-                          aria-label={`Edit ${label.toLowerCase()}`}
-                          onClick={() => {
-                            setEditingNameField(field)
-                            setNameDraft(profileForm[field] || '')
-                            window.setTimeout(() => document.getElementById(`profile-${field}`)?.focus(), 0)
-                          }}
-                        >✎</button>
-                      ) : (
-                        <div className="inline-edit-actions">
-                          <button type="button" onClick={(event) => handleSaveName(event, field)}>Save</button>
-                          <button type="button" onClick={() => { setEditingNameField(null); setNameDraft('') }}>Cancel</button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}
