@@ -2571,7 +2571,13 @@ function App() {
                     )}
 
                     <form
-
+                      onInvalidCapture={(event) => {
+                        const field = event.currentTarget.querySelector('input:invalid, select:invalid, textarea:invalid')
+                        if (event.target !== field) return
+                        const label = field.labels?.[0]?.textContent?.trim()
+                        setHostStationError([label, field.validationMessage].filter(Boolean).join(' — '))
+                        setHostStationMessage('')
+                      }}
                       onSubmit={async (event) => {
                         event.preventDefault()
 
@@ -2713,7 +2719,8 @@ function App() {
                           }
                         >
                           <option value="residential">Residential</option>
-                          <option value="commercial">Commercial</option>
+                          <option value="business">Commercial</option>
+                          <option value="private_hosted">Private hosted</option>
                           <option value="public">Public</option>
                         </select>
                       </label>
@@ -2758,6 +2765,7 @@ function App() {
                         Latitude
                         <input
                           type="number"
+                          required
                           step="any"
                           min="-90"
                           max="90"
@@ -2772,6 +2780,7 @@ function App() {
                         Longitude
                         <input
                           type="number"
+                          required
                           step="any"
                           min="-180"
                           max="180"
@@ -2785,6 +2794,7 @@ function App() {
                       <AmenitiesPicker value={hostStationForm.amenities}
                         onChange={amenities => setHostStationForm(form => ({ ...form, amenities }))} />
 
+                      {hostStationError && <p className="booking-error" role="alert">{hostStationError}</p>}
                       <div className="host-station-form-actions">
                         <button type="submit" disabled={hostStationSaving}>{hostStationSaving ? 'Saving station…' : 'Save charging station'}</button>
                         <button

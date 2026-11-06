@@ -122,6 +122,8 @@ router.post('/', async (req, res) => {
         const price = Number(pricePerKwh)
 
         if (
+            latitude == null || String(latitude).trim() === '' ||
+            longitude == null || String(longitude).trim() === '' ||
             !Number.isFinite(lat) ||
             lat < -90 ||
             lat > 90 ||
@@ -131,7 +133,7 @@ router.post('/', async (req, res) => {
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'Valid latitude and longitude are required. Find coordinates before saving.',
+                message: 'Use Current Location or enter valid latitude and longitude before saving.',
             })
         }
 
@@ -156,8 +158,9 @@ router.post('/', async (req, res) => {
             'private_hosted',
         ]
 
-        const normalizedStationType = validStationTypes.includes(stationType)
-            ? stationType
+        const requestedStationType = stationType === 'commercial' ? 'business' : stationType
+        const normalizedStationType = validStationTypes.includes(requestedStationType)
+            ? requestedStationType
             : null
 
         if (!normalizedStationType) {

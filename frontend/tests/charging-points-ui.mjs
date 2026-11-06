@@ -64,6 +64,11 @@ try {
     await cards.nth(2).screenshot({ path: `test-results/charging-points/bike-${width}.png` })
     await form.locator('.network-options').screenshot({ path: `test-results/charging-points/networks-${width}.png` })
   }
+  await form.getByLabel('Station Type').selectOption({ label: 'Commercial' })
+  await form.getByLabel('Latitude', { exact: true }).fill('')
+  await form.getByRole('button', { name: 'Save charging station' }).click()
+  await expect(form.getByRole('alert')).toContainText('Latitude')
+  await form.getByLabel('Latitude', { exact: true }).fill('12.9')
   await form.getByRole('button', { name: 'Save charging station' }).click()
   await expect(page.getByRole('heading', { name: 'Browser Multi Hub' })).toBeVisible()
   const stationCard = page.locator('.host-station-card').filter({ has: page.getByRole('heading', { name: 'Browser Multi Hub' }) })
