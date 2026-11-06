@@ -35,6 +35,11 @@ router.post('/reports', consumer, wrap(async (req, res) => {
     const incident = await reportIssue(req.session.consumerId, req.body || {})
     res.status(201).json({ incident, message: incident.chargingPointId ? `Issue recorded for ${incident.chargingPointName || 'your dock'}. Only this dock is paused; the host can review your report.` : 'Issue recorded. Reservations are paused and the host can review your report.' })
 }))
+router.get('/host/alerts', consumer, wrap(async (req, res) => {
+    const owned = await ChargingStation.find({ hostId: req.session.consumerId }).distinct('_id')
+    const count = await ChargingIncident.countDocuments({ station: { $in: owned }, resolvedAt: null })
+    res.json({ count })
+}))
 router.get('/host/incidents', consumer, wrap(async (req, res) => {
     const owned = await ChargingStation.find({ hostId: req.session.consumerId }).select('_id')
     // Persist expiry lazily on host reads, without relying on a running background timer.

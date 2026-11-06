@@ -14,6 +14,42 @@ export function HealthBadge({ state = 'ACTIVE' }) {
   return <span className={`cg-badge cg-${state.toLowerCase()}`}>{state}</span>
 }
 
+export function useChargeGuardAlerts(accountId) {
+  const [alert, setAlert] = useState(null)
+  useEffect(() => {
+    if (!accountId) return
+    const controller = new AbortController()
+    let pending = false
+    async function refresh() {
+      if (pending || controller.signal.aborted) return
+      pending = true
+      try {
+        const { count } = await chargeGuardRequest('/host/alerts', undefined, controller.signal).catch(async error => {
+          if (error.status !== 404) throw error
+          const { incidents } = await chargeGuardRequest('/host/incidents', undefined, controller.signal)
+          return { count: incidents.filter(incident => !incident.resolvedAt).length }
+        })
+        if (!controller.signal.aborted) setAlert({ accountId, count })
+      } catch {
+        // Keep the last known count until the service is reachable again.
+      } finally {
+        pending = false
+      }
+    }
+    refresh()
+    const timer = setInterval(refresh, 30000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('chargeguard-resolved', refresh)
+    return () => {
+      controller.abort()
+      clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('chargeguard-resolved', refresh)
+    }
+  }, [accountId])
+  return accountId && alert?.accountId === accountId ? alert.count : 0
+}
+
 export function BookingChargeGuard({ booking, onReported }) {
   const id = useId()
   const [open, setOpen] = useState(false)
@@ -29,8 +65,9 @@ export function BookingChargeGuard({ booking, onReported }) {
   useEffect(() => { if (open) select.current?.focus() }, [open])
   const close = () => { setOpen(false); trigger.current?.focus() }
   const atRisk = booking.status === 'confirmed' && ['PAUSED', 'SUSPENDED'].includes(state)
-  if (!atRisk && state !== 'PROBATION' && !booking.chargeGuardReportEligible && !message) return null
   return <div className="cg-booking">
+    <strong>ChargeGuard</strong>
+    {!booking.chargeGuardReportEligible && !atRisk && state !== 'PROBATION' && <p className="cg-muted">You can report an issue during a confirmed charging session or within 24 hours after it ends.</p>}
     {atRisk && <div className="cg-notice" role="status"><HealthBadge state={state} /><p><strong>Your reservation may be at risk.</strong> A charging issue was reported. Your booking remains in place, but charging may be unavailable.</p></div>}
     {state === 'PROBATION' && <p className="cg-muted">Host repair declared; dock or legacy station is in probation. Hardware has not been independently verified.</p>}
     {booking.chargeGuardReportEligible && !open && <button ref={trigger} type="button" className="button button-secondary cg-trigger" onClick={() => { setError(''); setOpen(true) }}>Report Charging Issue</button>}
@@ -108,7 +145,8 @@ export function HostChargeGuard() {
     return () => { controller.abort(); clearTimeout(timer) }
   }, [version])
   return <section className="cg-panel" aria-labelledby="cg-host-title">
-    <div className="cg-heading"><div><h3 id="cg-host-title">Charger Health</h3><p className="cg-muted">Reported issues and repair declarations · Updates every 30 seconds</p></div><button type="button" className="button button-secondary" onClick={() => setVersion((value) => value + 1)}>Refresh</button></div>
+    <div className="cg-heading"><div><h3 id="cg-host-title">ChargeGuard</h3><p className="cg-muted">Charger health, driver reports and repair confirmations · Updates every 30 seconds</p></div><button type="button" className="button button-secondary" onClick={() => setVersion((value) => value + 1)}>Refresh</button></div>
+    {incidents?.some(incident => !incident.resolvedAt) && <p className="cg-notice" role="status">A driver reported a charging issue. New bookings stay blocked for the affected dock or station until the issue is resolved.</p>}
     {error && <p role="alert">{error}</p>}
     {message && <p role="status" className="cg-notice">{message}</p>}
     {!incidents && !error && <p className="cg-loading" role="status">Loading reported issues…</p>}
@@ -125,7 +163,7 @@ export function HostChargeGuard() {
         {incident.description && <p className="cg-description">{incident.description}</p>}
         {state === 'SUSPENDED' ? <p className="cg-notice">Administrator review required. You cannot reactivate this dock or legacy station. A repeat report is not proof of dishonesty.</p> : !incident.resolvedAt ? <p className="cg-muted">Action required: investigate, repair, and test before declaring this issue resolved.</p> : <p className="cg-muted">Resolved {date(incident.resolvedAt)}{state === 'PROBATION' ? ` · Probation ends ${date(health?.probationUntil)}` : ''}</p>}
         <details><summary>{incident.repair?.at ? 'View repair declaration' : incident.resolvedAt ? 'View resolution' : 'Open incident'}</summary>
-          {incident.repair?.at ? <div className="cg-description"><p><strong>Problem:</strong> {incident.repair.problem}</p><p><strong>Fix:</strong> {incident.repair.fix}</p><p>Test declared by host · {date(incident.repair.at)}</p><p className="cg-muted">This is a host claim, not independent verification.</p></div> : incident.resolvedAt ? <p>Resolved through administrator review.</p> : state !== 'SUSPENDED' ? <RepairForm incident={incident} onSaved={() => { setMessage('Repair declaration saved. Affected dock or legacy station status is shown below.'); setVersion((value) => value + 1) }} /> : <p>Contact your administrator for review.</p>}
+          {incident.repair?.at ? <div className="cg-description"><p><strong>Problem:</strong> {incident.repair.problem}</p><p><strong>Fix:</strong> {incident.repair.fix}</p><p>Test declared by host · {date(incident.repair.at)}</p><p className="cg-muted">This is a host claim, not independent verification.</p></div> : incident.resolvedAt ? <p>Resolved through administrator review.</p> : state !== 'SUSPENDED' ? <RepairForm incident={incident} onSaved={() => { setMessage('Repair declaration saved. Affected dock or legacy station status is shown below.'); setVersion((value) => value + 1); window.dispatchEvent(new Event('chargeguard-resolved')) }} /> : <p>Contact your administrator for review.</p>}
         </details>
       </article>
     })}

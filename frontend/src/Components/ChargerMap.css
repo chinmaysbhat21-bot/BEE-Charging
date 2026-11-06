@@ -413,29 +413,6 @@
 .bee-native .consumer-content:has(.bee-discovery) {
   padding: 0 !important;
 }
-.bee-native .book-slot-page:has(.bee-discovery) .discovery-preferences {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  top: 122px;
-  z-index: 25;
-  border-radius: 12px;
-  box-shadow: var(--ev-shadow);
-}
-.bee-native .book-slot-page:has(.bee-discovery) .discovery-preferences > summary {
-  min-height: 44px;
-  padding: 12px;
-  font-size: 12px;
-}
-.bee-native .book-slot-page:has(.bee-discovery) .booking-results-toolbar {
-  position: fixed;
-  top: 172px;
-  left: 12px;
-  z-index: 24;
-  padding: 0;
-}
-.bee-native .book-slot-page:has(.bee-discovery) .booking-results-toolbar > span { display: none; }
-.bee-native .booking-results-toolbar .back-button { min-height: 40px; background: var(--ev-white); }
 .bee-native .bee-discovery {
   position: fixed;
   inset: 64px 0 calc(68px + env(safe-area-inset-bottom));
@@ -464,12 +441,101 @@
 .bee-native .bee-discovery .charging-station-card-facts { font-size: 12px; }
 .bee-native .bee-discovery .charging-station-card-actions { padding-top: 8px; }
 .bee-native .bee-discovery .charging-station-view-details { min-height: 44px; }
-.bee-native .book-slot-page:has(.bee-map-sheet[data-position=expanded]) .discovery-preferences,
-.bee-native .book-slot-page:has(.bee-map-sheet[data-position=expanded]) .booking-results-toolbar {
-  visibility: hidden;
+
+/* Compact map controls and results header. */
+.bee-discovery { --bee-sheet-height: 33%; }
+.bee-discovery[data-sheet=half] { --bee-sheet-height: 52%; }
+.bee-discovery[data-sheet=expanded] { --bee-sheet-height: 85%; }
+.bee-discovery .bee-map-locate {
+  display: grid;
+  place-items: center;
+  top: auto;
+  bottom: calc(var(--bee-sheet-height) + 12px);
+  right: 12px;
+  width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: var(--ev-shadow);
+  transition: bottom .2s ease;
 }
-.bee-native .book-slot-page:has(.bee-discovery) .booking-results-toolbar {
-  right: auto;
-  width: auto;
+.bee-discovery[data-sheet=expanded] .bee-map-locate,
+.bee-discovery[data-dragging=true] .bee-map-locate { visibility: hidden; }
+.bee-map-chips {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.bee-discovery .bee-map-refresh,
+.bee-native .bee-discovery .bee-discovery-filter,
+.bee-discovery .bee-discovery-filter {
+  margin: 0;
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid var(--ev-soft);
+  border-radius: 20px;
+}
+.bee-map-refresh { background: var(--ev-white); color: var(--ev-ink); font-weight: 650; }
+.bee-native .bee-discovery .leaflet-top,
+.bee-discovery .leaflet-top { top: 105px; }
+.bee-discovery .leaflet-bottom { bottom: var(--bee-sheet-height); }
+.bee-discovery .bee-sheet-handle {
+  min-height: 24px;
+  padding: 8px;
+}
+.bee-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.bee-sheet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 0 16px 6px;
+}
+.bee-sheet-heading strong, .bee-sheet-heading small { display: block; }
+.bee-sheet-heading small { color: var(--ev-muted); font-size: 12px; margin-top: 2px; }
+.bee-discovery .bee-map-view-all {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
   background: transparent;
+  color: var(--ev-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bee-discovery .bee-sheet-preferences .discovery-preferences {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+  visibility: visible;
+  border-bottom: 1px solid var(--ev-soft);
+}
+.bee-discovery .bee-sheet-preferences .discovery-preferences > summary {
+  padding: 11px 16px;
+  min-height: 44px;
+  font-size: 13px;
+}
+.bee-sheet-preferences .booking-topbar { border-radius: 0; }
+.bee-sheet-preferences .booking-sticky-stack { margin-bottom: 0 !important; }
+.bee-sheet-preferences .booking-controls { border-radius: 0 !important; }
+@media (max-width: 600px) {
+  .bee-sheet-preferences .booking-topbar { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (min-width: 1000px) {
+  html:not(.bee-native) .bee-discovery .bee-map-locate { bottom: 22px; }
+  html:not(.bee-native) .bee-discovery .leaflet-bottom { bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bee-discovery .bee-map-locate { transition: none; }
 }

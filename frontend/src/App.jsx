@@ -16,7 +16,7 @@ import { pointCompatible, pointView, pointAvailable } from '../../shared/chargin
 import { VehicleTypeSelector, BikeIllustration } from './Components/VehicleTypeSelector'
 import { BIKE_BATTERY_PROFILES } from './data/bikeBatteryProfiles'
 import { WalletPanel, BookingWallet, BookingPayment } from './Components/Wallet'
-import { BookingChargeGuard, HostChargeGuard } from './Components/ChargeGuard'
+import { BookingChargeGuard, HostChargeGuard, useChargeGuardAlerts } from './Components/ChargeGuard'
 import {
   EV_BATTERY_PROFILES,
   getBatteryFormValuesForProfile,
@@ -461,6 +461,7 @@ function App() {
     ...emptyHostStationForm,
   })
   const [loggedInConsumer, setLoggedInConsumer] = useState(null)
+  const chargeGuardAlertCount = useChargeGuardAlerts(loginComplete && (loggedInConsumer?._id || loggedInConsumer?.id || loggedInConsumer?.email || loggedInConsumer?.mobileNumber))
   const [signupSuccessNotice, setSignupSuccessNotice] = useState(false)
   const [profileForm, setProfileForm] = useState({
     firstName: '',
@@ -1729,6 +1730,126 @@ function App() {
   }, [loginComplete, menuOpen, activeSection, activeTab, bookingModalDraft, selectedStationId, bookSelectionView])
 
   if (loginComplete) {
+    const discoveryPreferences = (
+      <details className="discovery-preferences" open={!selectedBookingAddress || !selectedBookingBattery}>
+    <summary>Charging preferences</summary>
+    <div
+      className="booking-sticky-stack"
+      style={{
+        position: 'static',
+        top: 'auto',
+        zIndex: 19,
+        background: '#FFFFFF',
+        paddingBottom: 0,
+        marginBottom: '10px',
+      }}
+    >
+      <div
+        className="booking-topbar"
+        aria-label="Booking preferences"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+          gap: 0,
+          marginBottom: 0,
+          padding: '7px 10px',
+          border: '1px solid #F4F4F4',
+          borderBottom: 0,
+          borderRadius: '14px 14px 0 0',
+          background: '#FFFFFF',
+          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+        }}
+      >
+        <button
+          type="button"
+          className="booking-topbar-item booking-topbar-address"
+          onClick={() => setBookSelectionView('address')}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, width: '100%', padding: '10px 12px', border: 0, borderRight: '1px solid #F4F4F4', borderBottom: 0, borderRadius: 0, background: 'transparent', textAlign: 'left' }}
+        >
+          <span className="booking-topbar-icon">⌖</span>
+          <span className="booking-topbar-text"><small>CHARGING NEAR</small><strong>{selectedBookingAddress ? (selectedBookingAddress.id === 'current-location' ? ([selectedBookingAddress.house, selectedBookingAddress.street].filter(Boolean).join(', ') || selectedBookingAddress.landmark || 'Current Location') : ([selectedBookingAddress.house, selectedBookingAddress.street].filter(Boolean).join(', ') || selectedBookingAddress.nickname)) : 'Select address'}</strong><em>{selectedBookingAddress ? (selectedBookingAddress.id === 'current-location' ? [selectedBookingAddress.landmark, selectedBookingAddress.city, selectedBookingAddress.state].filter(Boolean).join(', ') || 'Current location detected' : [selectedBookingAddress.landmark, selectedBookingAddress.city].filter(Boolean).join(', ')) : 'Choose where to charge'}</em></span>
+          <span className="booking-topbar-edit">{selectedBookingAddress ? <><span aria-hidden="true">✎</span> Edit</> : <><span aria-hidden="true">＋</span> Select</>}</span>
+        </button>
+        <button
+          type="button"
+          className="booking-topbar-item booking-topbar-battery"
+          onClick={() => setBookSelectionView('battery')}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, width: '100%', padding: '10px 12px', border: 0, borderRadius: 0, background: 'transparent', textAlign: 'left' }}
+        >
+          <span className="booking-topbar-icon">🔋</span>
+          <span className="booking-topbar-text"><small>MY VEHICLE / BATTERY</small><strong>{selectedBookingBattery ? selectedBookingBattery.name : 'Select battery'}</strong><em>{selectedBookingBattery ? [[selectedBookingBattery.vehicleMake, selectedBookingBattery.vehicleModel].filter(Boolean).join(' ').trim(), `${selectedBookingBattery.capacityKwh || '—'} kWh`, ...((selectedBookingBattery.connectorTypes && selectedBookingBattery.connectorTypes.length) ? selectedBookingBattery.connectorTypes : (selectedBookingBattery.connectorType ? [selectedBookingBattery.connectorType] : []))].filter(Boolean).join(' · ') : 'Choose your vehicle and battery'}</em></span>
+          <span className="booking-topbar-edit">{selectedBookingBattery ? <><span aria-hidden="true">✎</span> Edit</> : <><span aria-hidden="true">＋</span> Select</>}</span>
+        </button>
+      </div>
+      <div className="booking-controls" aria-label="Charging preferences" style={{ marginTop: 0, marginBottom: 0, paddingTop: '10px', paddingBottom: '10px', borderTop: 0, borderRadius: '0 0 14px 14px' }}>
+        <label className="booking-control">
+          <span>Station vehicle facilities</span>
+          <select aria-label="Filter stations by vehicle category" value={stationVehicleFilter} onChange={(e) => { setStationVehicleFilter(e.target.value); setSelectedStationId(null); setSelectedTimeSlot(null) }}><option value="all">Cars and bikes</option><option value="car">Electric Car</option><option value="bike">Electric Bike</option></select>
+        </label>
+        <label className="booking-control booking-date-control">
+          <span>Charging Date</span>
+          <input
+            type="date"
+            value={selectedBookingDate}
+            min={getLocalDateInputValue()}
+            onChange={(event) => {
+              setSelectedBookingDate(event.target.value || getLocalDateInputValue())
+              setSelectedTimeSlot(null)
+            }}
+            aria-label="Choose charging date"
+          />
+        </label>
+        <label className="booking-control">
+          <span>Initial Charge</span>
+          <select value={initialCharge} onChange={(event) => {
+            const next = Number(event.target.value)
+            setInitialCharge(next)
+            if (next >= finalCharge) setFinalCharge(Math.min(100, next + 10))
+          }}>
+            {Array.from({ length: 21 }, (_, index) => index * 5).map((value) => (
+              <option key={value} value={value}>{value}%</option>
+            ))}
+          </select>
+        </label>
+        <label className="booking-control">
+          <span>Final Charge</span>
+          <select value={finalCharge} onChange={(event) => {
+            const next = Number(event.target.value)
+            if (next > initialCharge) setFinalCharge(next)
+          }}>
+            {Array.from({ length: 21 }, (_, index) => index * 5).map((value) => (
+              <option key={value} value={value} disabled={value <= initialCharge}>{value}%</option>
+            ))}
+          </select>
+        </label>
+        <div className="booking-control booking-filter-control">
+          <span>Filters <small>(select any)</small></span>
+          <div className="booking-filter-options">
+            {[
+              { value: 'distance', label: 'Distance' },
+              { value: 'chargingTime', label: 'Charging Time' },
+              { value: 'cost', label: 'Cost' },
+            ].map((filter) => (
+              <label key={filter.value} className={`booking-filter-chip ${bookingFilters.includes(filter.value) ? 'selected' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={bookingFilters.includes(filter.value)}
+                  onChange={(event) => {
+                    setBookingFilters((current) => {
+                      if (event.target.checked) return [...current, filter.value]
+                      const next = current.filter((item) => item !== filter.value)
+                      return next.length ? next : ['distance']
+                    })
+                  }}
+                />
+                {filter.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div></details>
+    )
     return (
       <div className={`consumer-shell${activeTab === 'profile' ? ' profile-shell' : ' book-shell'}`}>
         <header className={`consumer-header${activeTab === 'book' ? ' booking-main-header' : ''}${activeTab === 'book' && selectedStationId ? ' station-details-header' : ''}`}>
@@ -1754,8 +1875,13 @@ function App() {
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
+            aria-describedby={chargeGuardAlertCount > 0 ? 'chargeguard-menu-alert' : undefined}
           >
             ☰
+            {chargeGuardAlertCount > 0 && <span id="chargeguard-menu-alert" className="cg-menu-badge" role="status">
+              <span aria-hidden="true">{chargeGuardAlertCount > 99 ? '99+' : chargeGuardAlertCount}</span>
+              <span className="cg-sr-only">{chargeGuardAlertCount} unresolved ChargeGuard reports</span>
+            </span>}
           </button>
         </header>
 
@@ -1789,6 +1915,10 @@ function App() {
               }}
             >
               Host
+            </button>
+
+            <button type="button" onClick={() => { setActiveSection('host'); setMenuOpen(false) }}>
+              ChargeGuard{chargeGuardAlertCount > 0 ? ` · ${chargeGuardAlertCount} unresolved` : ''}
             </button>
 
             <button
@@ -3155,126 +3285,7 @@ function App() {
             <section className="book-slot-page">
               {bookSelectionView === 'main' ? (
                 <>
-                  {!selectedStationId && (
-                    <details className="discovery-preferences" open={!selectedBookingAddress || !selectedBookingBattery}>
-                    <summary>Address, vehicle &amp; charging preferences</summary>
-                    <div
-                      className="booking-sticky-stack"
-                      style={{
-                        position: 'static',
-                        top: 'auto',
-                        zIndex: 19,
-                        background: '#FFFFFF',
-                        paddingBottom: 0,
-                        marginBottom: '10px',
-                      }}
-                    >
-                      <div
-                        className="booking-topbar"
-                        aria-label="Booking preferences"
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-                          gap: 0,
-                          marginBottom: 0,
-                          padding: '7px 10px',
-                          border: '1px solid #F4F4F4',
-                          borderBottom: 0,
-                          borderRadius: '14px 14px 0 0',
-                          background: '#FFFFFF',
-                          boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="booking-topbar-item booking-topbar-address"
-                          onClick={() => setBookSelectionView('address')}
-                          style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, width: '100%', padding: '10px 12px', border: 0, borderRight: '1px solid #F4F4F4', borderBottom: 0, borderRadius: 0, background: 'transparent', textAlign: 'left' }}
-                        >
-                          <span className="booking-topbar-icon">⌖</span>
-                          <span className="booking-topbar-text"><small>CHARGING NEAR</small><strong>{selectedBookingAddress ? (selectedBookingAddress.id === 'current-location' ? ([selectedBookingAddress.house, selectedBookingAddress.street].filter(Boolean).join(', ') || selectedBookingAddress.landmark || 'Current Location') : ([selectedBookingAddress.house, selectedBookingAddress.street].filter(Boolean).join(', ') || selectedBookingAddress.nickname)) : 'Select address'}</strong><em>{selectedBookingAddress ? (selectedBookingAddress.id === 'current-location' ? [selectedBookingAddress.landmark, selectedBookingAddress.city, selectedBookingAddress.state].filter(Boolean).join(', ') || 'Current location detected' : [selectedBookingAddress.landmark, selectedBookingAddress.city].filter(Boolean).join(', ')) : 'Choose where to charge'}</em></span>
-                          <span className="booking-topbar-edit">{selectedBookingAddress ? <><span aria-hidden="true">✎</span> Edit</> : <><span aria-hidden="true">＋</span> Select</>}</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="booking-topbar-item booking-topbar-battery"
-                          onClick={() => setBookSelectionView('battery')}
-                          style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, width: '100%', padding: '10px 12px', border: 0, borderRadius: 0, background: 'transparent', textAlign: 'left' }}
-                        >
-                          <span className="booking-topbar-icon">🔋</span>
-                          <span className="booking-topbar-text"><small>MY VEHICLE / BATTERY</small><strong>{selectedBookingBattery ? selectedBookingBattery.name : 'Select battery'}</strong><em>{selectedBookingBattery ? [[selectedBookingBattery.vehicleMake, selectedBookingBattery.vehicleModel].filter(Boolean).join(' ').trim(), `${selectedBookingBattery.capacityKwh || '—'} kWh`, ...((selectedBookingBattery.connectorTypes && selectedBookingBattery.connectorTypes.length) ? selectedBookingBattery.connectorTypes : (selectedBookingBattery.connectorType ? [selectedBookingBattery.connectorType] : []))].filter(Boolean).join(' · ') : 'Choose your vehicle and battery'}</em></span>
-                          <span className="booking-topbar-edit">{selectedBookingBattery ? <><span aria-hidden="true">✎</span> Edit</> : <><span aria-hidden="true">＋</span> Select</>}</span>
-                        </button>
-                      </div>
-                      <div className="booking-controls" aria-label="Charging preferences" style={{ marginTop: 0, marginBottom: 0, paddingTop: '10px', paddingBottom: '10px', borderTop: 0, borderRadius: '0 0 14px 14px' }}>
-                        <label className="booking-control">
-                          <span>Station vehicle facilities</span>
-                          <select aria-label="Filter stations by vehicle category" value={stationVehicleFilter} onChange={(e) => { setStationVehicleFilter(e.target.value); setSelectedStationId(null); setSelectedTimeSlot(null) }}><option value="all">Cars and bikes</option><option value="car">Electric Car</option><option value="bike">Electric Bike</option></select>
-                        </label>
-                        <label className="booking-control booking-date-control">
-                          <span>Charging Date</span>
-                          <input
-                            type="date"
-                            value={selectedBookingDate}
-                            min={getLocalDateInputValue()}
-                            onChange={(event) => {
-                              setSelectedBookingDate(event.target.value || getLocalDateInputValue())
-                              setSelectedTimeSlot(null)
-                            }}
-                            aria-label="Choose charging date"
-                          />
-                        </label>
-                        <label className="booking-control">
-                          <span>Initial Charge</span>
-                          <select value={initialCharge} onChange={(event) => {
-                            const next = Number(event.target.value)
-                            setInitialCharge(next)
-                            if (next >= finalCharge) setFinalCharge(Math.min(100, next + 10))
-                          }}>
-                            {Array.from({ length: 21 }, (_, index) => index * 5).map((value) => (
-                              <option key={value} value={value}>{value}%</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="booking-control">
-                          <span>Final Charge</span>
-                          <select value={finalCharge} onChange={(event) => {
-                            const next = Number(event.target.value)
-                            if (next > initialCharge) setFinalCharge(next)
-                          }}>
-                            {Array.from({ length: 21 }, (_, index) => index * 5).map((value) => (
-                              <option key={value} value={value} disabled={value <= initialCharge}>{value}%</option>
-                            ))}
-                          </select>
-                        </label>
-                        <div className="booking-control booking-filter-control">
-                          <span>Filters <small>(select any)</small></span>
-                          <div className="booking-filter-options">
-                            {[
-                              { value: 'distance', label: 'Distance' },
-                              { value: 'chargingTime', label: 'Charging Time' },
-                              { value: 'cost', label: 'Cost' },
-                            ].map((filter) => (
-                              <label key={filter.value} className={`booking-filter-chip ${bookingFilters.includes(filter.value) ? 'selected' : ''}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={bookingFilters.includes(filter.value)}
-                                  onChange={(event) => {
-                                    setBookingFilters((current) => {
-                                      if (event.target.checked) return [...current, filter.value]
-                                      const next = current.filter((item) => item !== filter.value)
-                                      return next.length ? next : ['distance']
-                                    })
-                                  }}
-                                />
-                                {filter.label}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div></details>
-                  )}
+                  {!selectedStationId && (!selectedBookingAddress || !selectedBookingBattery || stationsLoading || stationsError) && discoveryPreferences}
                   <div className="booking-results-scroll" style={{ marginTop: 0, paddingTop: 0 }}>
                     {!selectedBookingAddress || !selectedBookingBattery ? (
                       <div className="booking-results-empty">
@@ -3608,8 +3619,10 @@ function App() {
                           </section>
                         }
                         return <div style={{ display: 'grid', gap: '8px', paddingBottom: '18px', marginTop: 0 }}>
-                          <div className="booking-results-toolbar"><span>Charging stations</span><button type="button" className="back-button" onClick={async () => { setStationsLoading(true); setStationsError(''); try { const response = await fetch('/api/charging-stations'); const data = await response.json().catch(() => ({})); if (!response.ok || data.success === false) throw new Error(data.message || 'Request failed'); setChargingStations(Array.isArray(data.stations) ? data.stations : []) } catch (error) { console.error('Charging stations refresh failed:', error); setStationsError('Could not refresh charging stations. Check the backend and try again.') } finally { setStationsLoading(false) } }}>Refresh</button></div>
+
                           <ChargerMap
+                            preferences={discoveryPreferences}
+                            refreshControl={<button type="button" className="bee-map-refresh" onClick={async () => { setStationsLoading(true); setStationsError(''); try { const response = await fetch('/api/charging-stations'); const data = await response.json().catch(() => ({})); if (!response.ok || data.success === false) throw new Error(data.message || 'Request failed'); setChargingStations(Array.isArray(data.stations) ? data.stations : []) } catch (error) { console.error('Charging stations refresh failed:', error); setStationsError('Could not refresh charging stations. Check the backend and try again.') } finally { setStationsLoading(false) } }}>Refresh</button>}
                             center={selectedBookingAddress.latitude != null && selectedBookingAddress.longitude != null
                               ? { lat: Number(selectedBookingAddress.latitude), lng: Number(selectedBookingAddress.longitude) } : null}
                             rows={sortedStations.map(({ station, estimate }) => {

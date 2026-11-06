@@ -15,9 +15,24 @@ export function healthState(station, now = new Date()) {
 export function assertBookable(station) {
     if (['PAUSED', 'SUSPENDED'].includes(healthState(station))) fail(409, 'ChargeGuard has paused reservations for this dock or legacy station. Existing bookings are preserved.')
 }
+
+function reportWindow(booking) {
+    const start = new Date(booking.startAt).getTime()
+    const end = new Date(booking.endAt).getTime()
+    const wallStart = `${booking.date}T${booking.startTime}:00`
+    const wallEnd = `${booking.date}T${booking.endTime}:00`
+    // Hosted bookings parsed these India wall times in the server's UTC timezone.
+    // Only reinterpret records whose stored timestamps match that exact pattern.
+    if (start === Date.parse(wallStart + 'Z') && end === Date.parse(wallEnd + 'Z')) {
+        return { start: Date.parse(wallStart + '+05:30'), end: Date.parse(wallEnd + '+05:30') }
+    }
+    return { start, end }
+}
+
 export function eligibleBooking(booking, consumerId, now = new Date()) {
-    return Boolean(booking && String(booking.consumerId) === String(consumerId) && booking.status === 'confirmed' &&
-        new Date(booking.startAt) <= now && new Date(booking.endAt).getTime() + 24 * 60 * 60 * 1000 >= now.getTime())
+    if (!booking || String(booking.consumerId) !== String(consumerId) || booking.status !== 'confirmed') return false
+    const { start, end } = reportWindow(booking)
+    return start <= now.getTime() && end + 24 * 60 * 60 * 1000 >= now.getTime()
 }
 function text(value, label, required = true) {
     if (value === undefined && !required) return ''
@@ -79,7 +94,7 @@ export async function reportIssue(consumerId, input) {
         const from = target.chargeGuard.state
         // A late report about a pre-repair attempt is not evidence of a failed repair.
         const prior = await ChargingIncident.findOne({ station: station._id, ...scope(pointId), category: input.category,
-            booking: { $ne: booking._id }, 'repair.at': { $lte: booking.startAt, ...(target.chargeGuard.reviewedAt ? { $gt: target.chargeGuard.reviewedAt } : {}) },
+            booking: { $ne: booking._id }, 'repair.at': { $lte: new Date(reportWindow(booking).start), ...(target.chargeGuard.reviewedAt ? { $gt: target.chargeGuard.reviewedAt } : {}) },
             'repair.probationUntil': { $gt: now },
         }).session(session)
         const suspended = from === 'SUSPENDED' || Boolean(prior)

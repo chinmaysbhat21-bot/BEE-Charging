@@ -4,7 +4,7 @@ export async function chargeGuardRequest(path, body, signal) {
     headers: { 'Content-Type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
-  const result = await response.json()
-  if (!response.ok) throw new Error(result.message || 'Unable to complete this request.')
+  const result = response.ok ? await response.json() : await response.json().catch(() => ({}))
+  if (!response.ok) throw Object.assign(new Error(result.message || 'Unable to complete this request.'), { status: response.status })
   return result
 }

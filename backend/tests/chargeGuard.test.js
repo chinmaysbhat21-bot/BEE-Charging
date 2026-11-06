@@ -18,7 +18,7 @@ import IncidentEvent from '../models/IncidentEvent.js'
 import guardRoutes from '../routes/chargeGuard.js'
 import bookingRoutes from '../routes/bookings.js'
 import stationRoutes from '../routes/chargingStations.js'
-import { healthState } from '../services/chargeGuard.js'
+import { eligibleBooking, healthState } from '../services/chargeGuard.js'
 
 let mongo, app, station, booking, consumer
 const owner = new mongoose.Types.ObjectId().toString()
@@ -52,6 +52,17 @@ async function makeBooking(overrides = {}) {
 const post = (path, body, actor = user) => request(app).post(`/api/chargeguard${path}`).set('x-test-user', actor).send(body)
 const report = (body = {}, actor = user) => post('/reports', { bookingId: String(booking._id), category: 'charger_malfunction', description: 'Charging failed', ...body }, actor)
 const getStation = () => ChargingStation.findById(station._id)
+test('hosted booking report window uses the displayed India time', () => {
+  const hostedBooking = {
+    consumerId: user, status: 'confirmed', date: '2026-11-06',
+    startTime: '21:04', endTime: '21:40',
+    startAt: new Date('2026-11-06T21:04:00Z'), endAt: new Date('2026-11-06T21:40:00Z'),
+  }
+  assert.equal(eligibleBooking(hostedBooking, user, new Date('2026-11-06T21:03:59+05:30')), false)
+  assert.equal(eligibleBooking(hostedBooking, user, new Date('2026-11-06T21:15:00+05:30')), true)
+  assert.equal(eligibleBooking(hostedBooking, user, new Date('2026-11-07T21:40:01+05:30')), false)
+  assert.equal(eligibleBooking(hostedBooking, outsider, new Date('2026-11-06T21:15:00+05:30')), false)
+})
 async function repaired() {
   const result = await report(); assert.equal(result.status, 201)
   const response = await post(`/incidents/${result.body.incident._id}/repair`, repair, owner)
@@ -78,6 +89,13 @@ test('valid report is permanent, pauses station, preserves status and booking, a
   assert.equal(host.body.incidents[0].station.name, station.name)
   const other = await request(app).get('/api/chargeguard/host/incidents').set('x-test-user', outsider)
   assert.deepEqual(other.body.incidents, [])
+  const hostAlert = await request(app).get('/api/chargeguard/host/alerts').set('x-test-user', owner)
+  assert.equal(hostAlert.status, 200)
+  assert.deepEqual(hostAlert.body, { count: 1 })
+  const otherAlert = await request(app).get('/api/chargeguard/host/alerts').set('x-test-user', outsider)
+  assert.equal(otherAlert.status, 200)
+  assert.deepEqual(otherAlert.body, { count: 0 })
+  assert.equal((await request(app).get('/api/chargeguard/host/alerts')).status, 401)
   const mine = await request(app).get('/api/bookings/my').set('x-test-user', user)
   assert.equal(mine.body.bookings[0].stationHealth, 'PAUSED')
 })

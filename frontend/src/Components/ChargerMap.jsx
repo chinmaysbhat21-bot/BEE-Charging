@@ -3,7 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './ChargerMap.css'
 
-export default function ChargerMap({ rows, center, renderCard, empty }) {
+export default function ChargerMap({ rows, center, renderCard, empty, preferences, refreshControl }) {
   const container = useRef(null)
   const cards = useRef(null)
   const markers = useRef(new Map())
@@ -108,19 +108,22 @@ export default function ChargerMap({ rows, center, renderCard, empty }) {
   }
 
   return <section className="bee-discovery" data-sheet={sheetPosition} aria-label="Charger discovery">
-    <header className="bee-discovery-heading">
-      <div><h2>Find a charger</h2><p>{position ? 'Distances from your current location' : center ? 'Distances from your selected address' : 'Use your location to see station distances'}</p></div>
-      <button type="button" className="button button-secondary bee-map-locate" disabled={!engine || locating || denied} onClick={locate}>{locating ? 'Locating…' : 'Use my location'}</button>
-    </header>
+    <button type="button" className="bee-map-locate" aria-label="Use my location" title="Use my location"
+      aria-busy={locating} disabled={!engine || locating || denied} onClick={locate}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" />
+        <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+      </svg>
+    </button>
     <div className="bee-discovery-tools">
       <label>Search chargers<input type="search" placeholder="Station, area, network or connector" value={query} onChange={event => setQuery(event.target.value)} /></label>
-      <label className="bee-discovery-filter"><input type="checkbox" checked={availableOnly} onChange={event => setAvailableOnly(event.target.checked)} /> Bookable only</label>
+      <div className="bee-map-chips">
+        {refreshControl}
+        <label className="bee-discovery-filter"><input type="checkbox" checked={availableOnly} onChange={event => setAvailableOnly(event.target.checked)} /> Bookable only</label>
+      </div>
     </div>
     <div className="bee-map-stage">
       <div ref={container} className="bee-map-canvas" aria-label="Interactive charger map" />
-      {engine && visible.some(row => row.position) && <button type="button" className="bee-map-fit" onClick={() => {
-        engine.map.fitBounds(L.latLngBounds(visible.filter(row => row.position).map(row => row.position)), { padding: [30, 30], maxZoom: 13 })
-      }}>Show all results</button>}
       {!engine && !message && <p role="status" className="bee-map-loading">Loading map…</p>}
     </div>
     {message && <p className="bee-map-note" role="status">{message}</p>}
@@ -130,6 +133,7 @@ export default function ChargerMap({ rows, center, renderCard, empty }) {
           dragged.current = false
           drag.current = { y: event.clientY, height: sheet.current.offsetHeight }
           sheet.current.style.transition = 'none'
+          sheet.current.parentElement.dataset.dragging = 'true'
           event.currentTarget.setPointerCapture(event.pointerId)
         }}
         onPointerMove={event => {
@@ -146,13 +150,23 @@ export default function ChargerMap({ rows, center, renderCard, empty }) {
           }
           sheet.current.style.height = ''
           sheet.current.style.transition = ''
+          delete sheet.current.parentElement.dataset.dragging
           drag.current = null
         }}
-        onPointerCancel={() => { drag.current = null; sheet.current.style.height = ''; sheet.current.style.transition = '' }}
+        onPointerCancel={() => { drag.current = null; sheet.current.style.height = ''; sheet.current.style.transition = ''; delete sheet.current.parentElement.dataset.dragging }}
         onClick={event => { if (!dragged.current || event.detail === 0) setSheetPosition(current => current === 'collapsed' ? 'half' : current === 'half' ? 'expanded' : 'collapsed') }}>
-        {visible.length} {visible.length === 1 ? 'charger' : 'chargers'} found
+        <span className="bee-sr-only">Resize charger results</span>
       </button>
+      <div className="bee-sheet-heading">
+        <div><strong>Nearby chargers</strong><small>{visible.length} {visible.length === 1 ? 'charger' : 'chargers'} found</small></div>
+        {engine && visible.some(row => row.position) && <button type="button" className="bee-map-view-all" onClick={() => {
+          engine.map.fitBounds(L.latLngBounds(visible.filter(row => row.position).map(row => row.position)), { padding: [30, 30], maxZoom: 13 })
+        }}>Show all</button>}
+      </div>
       <div className="bee-map-cards" ref={cards}>
+        <div className="bee-sheet-preferences" onToggle={event => {
+          if (event.target.open) setSheetPosition(current => current === 'collapsed' ? 'half' : current)
+        }}>{preferences}</div>
         {visible.length ? visible.map(row => <div key={row.id} data-selected={selected === row.id} className="bee-map-result">
           <button type="button" className="bee-map-select" disabled={!row.position} aria-label={row.position ? 'Show ' + row.station.name + ' on map' : row.station.name + ' · map location unavailable'} aria-pressed={selected === row.id} onClick={() => {
             setSelected(row.id)
