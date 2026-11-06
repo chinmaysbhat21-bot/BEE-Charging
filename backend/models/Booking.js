@@ -3,6 +3,9 @@ import mongoose from 'mongoose'
 
 const bookingSchema = new mongoose.Schema(
     {
+        chargingPointId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        chargingPointName: { type: String, default: '' },
+        pricePerKWh: { type: Number, min: 0 },
         station: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'ChargingStation',
@@ -94,6 +97,7 @@ bookingSchema.index({
     status: 1,
 })
 
+bookingSchema.index({ station: 1, chargingPointId: 1, status: 1, startAt: 1, endAt: 1 })
 const Booking = mongoose.model('Booking', bookingSchema)
 
 export default Booking

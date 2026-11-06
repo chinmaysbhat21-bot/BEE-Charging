@@ -127,6 +127,8 @@ function batteryPayload(body = {}) {
     maxAcChargingPowerKw
 
   return {
+    vehicleType: body.vehicleType ?? "car",
+    batteryVoltage: parseOptionalNumber(body.batteryVoltage),
     name: normalizeString(body.name),
     vehicleMake: normalizeString(body.vehicleMake),
     vehicleModel: normalizeString(body.vehicleModel),
@@ -142,6 +144,8 @@ function batteryPayload(body = {}) {
 }
 
 function validateBattery(battery) {
+  if (!["bike", "car"].includes(battery.vehicleType)) return "Choose Electric Bike or Electric Car."
+  if (battery.batteryVoltage !== undefined && (!Number.isFinite(battery.batteryVoltage) || battery.batteryVoltage < 0.1)) return "Enter a valid positive battery voltage."
   const allowedChemistries = [
     'LFP',
     'NMC',
@@ -1157,6 +1161,8 @@ router.put(
         })
       }
 
+      if (req.body.vehicleType === undefined) battery.vehicleType = currentBattery.vehicleType || 'car'
+      if (req.body.batteryVoltage === undefined) battery.batteryVoltage = currentBattery.batteryVoltage
       currentBattery.set(battery)
       await consumer.save()
 

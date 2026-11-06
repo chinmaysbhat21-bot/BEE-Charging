@@ -1,0 +1,6 @@
+.vehicle-types{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}
+.vehicle-type-card{display:grid;justify-items:center;gap:8px;padding:16px 10px;border:2px solid var(--ev-soft);border-radius:var(--ev-radius-card);background:var(--ev-white);color:var(--ev-ink);transition:background .15s,border-color .15s;min-width:0}
+.vehicle-type-card[aria-pressed=true]{background:var(--ev-lime);border-color:var(--ev-ink)}
+.vehicle-type-card:hover{border-color:var(--ev-ink)}
+.vehicle-type-card span{font-size:.8rem;color:var(--ev-muted)}
+.vehicle-bike-art{display:block;width:100%;max-width:150px;height:80px;color:var(--ev-ink)}

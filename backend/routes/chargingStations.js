@@ -2,6 +2,7 @@ import mongoose from 'mongoose'
 import express from 'express'
 import ChargingStation from '../models/ChargingStation.js'
 import Booking from '../models/Booking.js'
+import { validatePoints, validateNetwork, stationViews, protectPointChanges } from '../services/chargingPoints.js'
 
 const router = express.Router()
 
@@ -15,7 +16,7 @@ router.get('/', async (req, res) => {
         res.status(200).json({
             success: true,
             count: stations.length,
-            stations,
+            stations: await stationViews(stations),
         })
     } catch (error) {
         console.error('Error fetching charging stations:', error.message)
@@ -47,7 +48,7 @@ router.get('/my', async (req, res) => {
         return res.status(200).json({
             success: true,
             count: stations.length,
-            stations,
+            stations: await stationViews(stations),
         })
     } catch (error) {
         console.error('Error fetching host charging stations:', error.message)
@@ -61,6 +62,14 @@ router.get('/my', async (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
+        if (!req.session?.consumerId) return res.status(401).json({ message: 'Please log in.' })
+        const points = req.body.chargingPoints === undefined ? null : validatePoints(req.body.chargingPoints)
+        const network = validateNetwork(req.body)
+        if (points) {
+            const first = points[0]
+            req.body = { ...req.body, chargerType: first.chargingMode, connectorTypes: first.connectorTypes, powerOutputKW: first.powerOutputKW, totalPorts: first.totalPorts, pricePerKwh: first.pricePerKWh }
+        }
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.openingTime || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.closingTime || '') || req.body.openingTime >= req.body.closingTime) return res.status(400).json({ message: 'Enter valid same-day opening and closing times.' })
         const {
             name,
             address,
@@ -225,7 +234,9 @@ router.post('/', async (req, res) => {
                 coordinates: [lng, lat],
             },
             hostId,
-            chargers: [
+            ...network,
+            pointBookingEnabled: Boolean(points),
+            chargers: points || [
                 {
                     chargerType: normalizedChargerType,
                     chargingMode,
@@ -257,6 +268,7 @@ router.post('/', async (req, res) => {
             station,
         })
     } catch (error) {
+        if (error.statusCode) return res.status(error.statusCode).json({ message: error.message })
         console.error('Error creating charging station:', error)
 
         if (error.code === 11000) {
@@ -286,69 +298,39 @@ router.post('/', async (req, res) => {
  * Delete a host's charging station only if it has no bookings.
  */
 router.delete('/:id', async (req, res) => {
+    if (!req.session?.consumerId) return res.status(401).json({ message: 'Please log in before deleting a charging station.' })
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid charging station ID.' })
     try {
-        const hostId = req.session?.consumerId
-        const { id } = req.params
-
-        // 1. Verify that the host is logged in.
-        if (!hostId || !mongoose.isValidObjectId(hostId)) {
-            return res.status(401).json({
-                success: false,
-                message: 'Please log in before deleting a charging station.',
-            })
-        }
-
-        // 2. Validate the station ID.
-        if (!mongoose.isValidObjectId(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid charging station ID.',
-            })
-        }
-
-        // 3. Find a station belonging to this host only.
-        const station = await ChargingStation.findOne({
-            _id: id,
-            hostId,
+        await mongoose.connection.transaction(async (session) => {
+            const station = await ChargingStation.findOne({ _id: req.params.id, hostId: req.session.consumerId }).session(session)
+            if (!station) throw Object.assign(new Error('Station not found.'), { statusCode: 404 })
+            if (await Booking.exists({ station: station._id }).session(session)) throw Object.assign(new Error('This station has booking history and cannot be deleted.'), { statusCode: 409 })
+            await ChargingStation.deleteOne({ _id: station._id, hostId: req.session.consumerId }, { session })
         })
-
-        if (!station) {
-            return res.status(404).json({
-                success: false,
-                message: 'Charging station not found or you do not have permission to delete it.',
-            })
-        }
-
-        // 4. Prevent deletion if any booking references this station.
-        // Import Booking at the top of this file.
-        const hasBookings = await Booking.exists({
-            stationId: station._id,
-        })
-
-        if (hasBookings) {
-            return res.status(409).json({
-                success: false,
-                message: 'This charging station cannot be deleted because it has booking records.',
-            })
-        }
-
-        // 5. Delete the station only after all checks pass.
-        await ChargingStation.deleteOne({
-            _id: station._id,
-            hostId,
-        })
-
-        return res.status(200).json({
-            success: true,
-            message: 'Charging station deleted successfully.',
-        })
+        res.json({ success: true, message: 'Charging station deleted successfully.' })
     } catch (error) {
-        console.error('Error deleting charging station:', error)
+        res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to delete station.' })
+    }
+})
 
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to delete charging station.',
+router.put('/:id/points', async (req, res) => {
+    if (!req.session?.consumerId) return res.status(401).json({ message: 'Please log in.' })
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid station ID.' })
+    try {
+        const station = await mongoose.connection.transaction(async (session) => {
+            const owned = await ChargingStation.findOne({ _id: req.params.id, hostId: req.session.consumerId }).session(session)
+            if (!owned) throw Object.assign(new Error('Station not found.'), { statusCode: 404 })
+            const points = validatePoints(req.body.chargingPoints, owned.chargers)
+            await protectPointChanges(owned, points, session)
+            owned.chargers = points
+            owned.pointBookingEnabled = true
+            Object.assign(owned, validateNetwork(req.body))
+            await owned.save({ session })
+            return owned
         })
+        res.json({ station, message: 'Charging points saved.' })
+    } catch (error) {
+        res.status(error.statusCode || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.statusCode || error.name === 'ValidationError' ? error.message : 'Unable to save charging points.' })
     }
 })
 

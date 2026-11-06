@@ -168,6 +168,8 @@ export const EV_BATTERY_PROFILES = [
 
 export function getBatteryFormValuesForProfile(profile, variant = null) {
   return {
+    vehicleType: profile.vehicleType || "car",
+    batteryVoltage: "",
     name: variant ? `${profile.model} ${variant.label}` : profile.model,
     vehicleMake: profile.make,
     vehicleModel: variant ? `${profile.model} (${variant.label.split(' · ')[0]})` : profile.model,

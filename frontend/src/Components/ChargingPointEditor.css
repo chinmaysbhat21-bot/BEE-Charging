@@ -1,0 +1,26 @@
+.points-editor,.station-point-manager{width:100%;min-width:0;text-align:left;color:var(--ev-ink)}
+.points-editor fieldset,.station-point-manager fieldset{min-width:0;border:1px solid var(--ev-line);border-radius:var(--ev-radius-card);padding:18px;margin:18px 0}
+.points-editor legend{font-weight:700;padding:0 8px;overflow-wrap:anywhere;max-width:100%}
+.points-editor label{display:flex;flex-direction:column;gap:8px;font-size:.875rem;min-width:0}
+.points-editor input,.points-editor select{width:100%;min-width:0;padding:11px;border:1px solid var(--ev-line);border-radius:10px;background:var(--ev-white)}
+.point-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.network-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}
+.network-options label{padding:12px;border:1px solid var(--ev-soft);border-radius:14px;cursor:pointer}
+.network-options label.selected{background:var(--ev-lime);border-color:var(--ev-ink)}
+.network-options input,.point-models input{width:18px;height:18px;flex:none;accent-color:var(--ev-ink)}
+.network-provider-icon{display:inline-flex;width:36px;height:36px;flex:none;border-radius:50%;background-color:white;background-repeat:no-repeat;background-size:648px auto;align-items:center;justify-content:center}
+.network-provider-icon-independent{background:var(--ev-soft);font-size:1.1rem;font-weight:700}
+.point-models{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0}
+.point-models label{padding:12px;background:var(--ev-mist);border-radius:12px}
+.points-help,.point-models small{font-size:.82rem;color:var(--ev-muted)}
+.point-spec{padding:14px;border:1px solid var(--ev-soft);border-radius:12px;margin:12px 0}
+.points-editor summary,.station-point-manager summary{cursor:pointer;font-weight:700;padding:12px 0}
+.point-selector{display:grid;gap:8px;margin:18px 0;width:100%;min-width:0}
+.point-selector select{padding:12px;border:1px solid var(--ev-line);border-radius:12px;width:100%;min-width:0;background:var(--ev-white)}
+.host-dashboard .points-editor .vehicle-type-card{background:var(--ev-white)!important;color:var(--ev-ink)!important;border:2px solid var(--ev-line)!important;border-radius:var(--ev-radius-card)!important;padding:16px 10px}
+.host-dashboard .points-editor .vehicle-type-card[aria-pressed=true]{background:var(--ev-lime)!important;border-color:var(--ev-ink)!important}
+.host-dashboard .points-editor .vehicle-type-card:hover{border-color:var(--ev-ink)!important}
+.host-dashboard .host-station-form .points-editor label{display:flex;flex-direction:column;gap:8px;margin-bottom:0}
+.host-dashboard .points-editor input[type=checkbox],.host-dashboard .points-editor input[type=radio]{width:18px;height:18px;margin:0;align-self:flex-start}
+.host-dashboard .points-editor .point-models label{padding:12px;border:1px solid var(--ev-line);border-radius:12px;line-height:1.5}
+@media(max-width:600px){.point-fields{grid-template-columns:1fr}.points-editor fieldset,.station-point-manager fieldset{padding:12px}.point-models{grid-template-columns:1fr}}

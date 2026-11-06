@@ -3,6 +3,18 @@ import mongoose from 'mongoose'
 
 const chargerSchema = new mongoose.Schema(
     {
+        name: { type: String, trim: true, maxlength: 100, default: '' },
+        vehicleType: { type: String, enum: ['car', 'bike'], default: 'car' },
+        availability: { type: String, enum: ['available', 'offline', 'maintenance'], default: 'available' },
+        pricePerKWh: { type: Number, min: 0 },
+        supportedVehicles: [{
+            _id: false,
+            make: { type: String, maxlength: 100 },
+            model: { type: String, maxlength: 100 },
+            capacityKwh: { type: Number, min: 0.1 },
+            batteryVoltage: { type: Number, min: 0.1 },
+            batteryChemistry: { type: String, enum: ['LFP', 'NMC', 'Other/Unknown'] },
+        }],
         chargerType: {
             type: String,
             enum: ['portable', 'wallbox', 'AC', 'DC', 'other'],
@@ -124,6 +136,20 @@ const timeSlotSchema = new mongoose.Schema(
 
 const chargingStationSchema = new mongoose.Schema(
     {
+        pointBookingEnabled: { type: Boolean, default: false },
+        chargingNetwork: { type: String, default: '', maxlength: 100 },
+        otherNetworkName: { type: String, default: '', maxlength: 100 },
+        chargeGuard: {
+            type: new mongoose.Schema({
+                state: { type: String, enum: ['ACTIVE', 'PAUSED', 'PROBATION', 'SUSPENDED'], default: 'ACTIVE' },
+                repairAt: Date,
+                probationUntil: Date,
+                reviewedAt: Date,
+                suspensionCount: { type: Number, default: 0 },
+                suspensionReason: { type: String, default: '' },
+            }, { _id: false }),
+            default: () => ({}),
+        },
         name: {
             type: String,
             required: true,

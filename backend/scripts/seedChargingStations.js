@@ -371,7 +371,7 @@ async function seedChargingStations() {
         await ChargingStation.findOneAndUpdate(
             { stationCode: station.stationCode },
             {
-                $set: {
+                $setOnInsert: {
                     ...station,
                     status: 'available',
                     openingHours: `${hours.open}-${hours.close}`,

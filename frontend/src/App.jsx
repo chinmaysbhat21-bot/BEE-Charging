@@ -1,3 +1,4 @@
+import { newChargingPoint } from './data/chargingPointDefaults'
 import React, { useEffect, useState } from 'react'
 import './App.css'
 import './reference-tokens.css'
@@ -8,6 +9,11 @@ import './ev-profile-picker.css'
 import './product-polish.css'
 import Signup from './Components/Signup'
 import Login from './Components/Login'
+import { ChargingPointEditor, StationPointManager } from './Components/ChargingPointEditor'
+import { pointCompatible, pointView } from '../../shared/chargingPoints'
+import { VehicleTypeSelector, BikeIllustration } from './Components/VehicleTypeSelector'
+import { BIKE_BATTERY_PROFILES } from './data/bikeBatteryProfiles'
+import { BookingChargeGuard, HostChargeGuard } from './Components/ChargeGuard'
 import {
   EV_BATTERY_PROFILES,
   getBatteryFormValuesForProfile,
@@ -66,6 +72,8 @@ function normalizeSavedBattery(battery) {
 
   return {
     id: String(battery._id || battery.id || ''),
+    vehicleType: battery.vehicleType || 'car',
+    batteryVoltage: battery.batteryVoltage ?? '',
     name: battery.name || '',
     vehicleMake: battery.vehicleMake || '',
     vehicleModel: battery.vehicleModel || '',
@@ -101,10 +109,12 @@ function describeStationPricing(pricing) {
 }
 
 function stationIsAvailable(station) {
-  return !station.status || station.status === 'available'
+  return (!station.status || station.status === 'available') && !['PAUSED', 'SUSPENDED'].includes(station.chargeGuard?.state)
 }
 
 function getCompatibleCharger(station, battery) {
+  if (station.pointBookingEnabled) return (station.chargers || []).find((point) => point.availability === 'available' && pointCompatible(point, battery)) || null
+  if ((battery?.vehicleType || 'car') !== 'car') return null
   const vehicleConnectors = (battery?.connectorTypes?.length ? battery.connectorTypes : battery?.connectorType ? [battery.connectorType] : []).map((connector) => connector.trim().toLowerCase())
   if (!vehicleConnectors.length) return null
   return (station.chargers || []).find((charger) => (charger.connectorTypes || []).some((connector) => vehicleConnectors.includes(String(connector).trim().toLowerCase()))) || null
@@ -129,7 +139,7 @@ function getStationEstimate(station, battery, initialCharge, finalCharge, addres
   const chargerPower = Number(charger.powerOutputKW || 0)
   const effectivePower = Math.min(vehiclePower, chargerPower)
   const durationMinutes = energyKwh > 0 && effectivePower > 0 ? Math.ceil((energyKwh / effectivePower) * 60 / 0.9) : null
-  const pricing = station.pricing || {}
+  const pricing = station.pointBookingEnabled && charger.pricePerKWh != null ? { pricingModel: 'per_kwh', pricePerKWh: charger.pricePerKWh } : station.pricing || {}
   let estimatedCost = null
   if (pricing.pricingModel === 'per_kwh') estimatedCost = energyKwh * Number(pricing.pricePerKWh || 0)
   else if (pricing.pricingModel === 'per_minute') estimatedCost = durationMinutes == null ? null : durationMinutes * Number(pricing.pricePerMinute || 0)
@@ -418,7 +428,12 @@ function App() {
   const [hostStationMessage, setHostStationMessage] = useState('')
   const [hostStationToDelete, setHostStationToDelete] = useState(null)
 
+  const [selectedChargingPointId, setSelectedChargingPointId] = useState('')
+  const [stationVehicleFilter, setStationVehicleFilter] = useState('all')
   const emptyHostStationForm = {
+    chargingNetwork: '',
+    otherNetworkName: '',
+    chargingPoints: [newChargingPoint()],
     name: '',
     address: '',
     area: '',
@@ -466,6 +481,8 @@ function App() {
     pincode: '',
   })
   const emptyBatteryForm = {
+    vehicleType: '',
+    batteryVoltage: '',
     name: '',
     vehicleMake: '',
     vehicleModel: '',
@@ -513,7 +530,8 @@ function App() {
 
   const isMobileValid = /^\d{10}$/.test(loginContact.mobileNumber)
 
-  const selectedEvProfile = EV_BATTERY_PROFILES.find(
+  const availableVehicleProfiles = batteryForm.vehicleType === 'bike' ? BIKE_BATTERY_PROFILES : EV_BATTERY_PROFILES
+  const selectedEvProfile = availableVehicleProfiles.find(
     (profile) => profile.id === selectedEvProfileId
   ) || null
   const hasValidLoginContact =
@@ -619,8 +637,8 @@ function App() {
 
     let cancelled = false
 
-    const fetchMyBookings = async () => {
-      setBookingsLoading(true)
+    const fetchMyBookings = async (quiet = false) => {
+      if (!quiet) setBookingsLoading(true)
       setBookingsError('')
 
       try {
@@ -656,9 +674,14 @@ function App() {
     }
 
     fetchMyBookings()
+    const refreshBookings = () => fetchMyBookings(true)
+    const poll = setInterval(refreshBookings, 30000)
+    window.addEventListener('chargeguard-report', refreshBookings)
 
     return () => {
       cancelled = true
+      clearInterval(poll)
+      window.removeEventListener('chargeguard-report', refreshBookings)
     }
   }, [activeSection])
 
@@ -735,8 +758,8 @@ function App() {
 
   // The host screen must show the signed-in owner's stations, not every
   // publicly available charger. This uses the existing authenticated endpoint.
-  const fetchHostedStations = async () => {
-    setHostStationsLoading(true)
+  const fetchHostedStations = async (quiet = false) => {
+    if (!quiet) setHostStationsLoading(true)
     setHostStationsError('')
     try {
       const response = await fetch('/api/charging-stations/my', { credentials: 'include' })
@@ -1154,6 +1177,8 @@ function App() {
       return
     }
     const payload = {
+      vehicleType: batteryForm.vehicleType,
+      batteryVoltage: batteryForm.batteryVoltage === '' ? null : Number(batteryForm.batteryVoltage),
       name: batteryForm.name.trim(),
       vehicleMake: batteryForm.vehicleMake.trim(),
       vehicleModel: batteryForm.vehicleModel.trim(),
@@ -1223,7 +1248,7 @@ function App() {
     setSelectedEvVariantId('')
     setEvProfileMode('choose')
     setEvProfileReviewed(false)
-    setBatteryForm({ ...emptyBatteryForm, name: `Battery ${savedBatteries.length + 1}` })
+    setBatteryForm({ ...emptyBatteryForm, vehicleType: batteryForm.vehicleType, name: `Battery ${savedBatteries.length + 1}` })
     setProfileMessage('')
   }
 
@@ -1232,7 +1257,7 @@ function App() {
     setSelectedEvVariantId('')
     setEvProfileMode('custom')
     setEvProfileReviewed(false)
-    setBatteryForm({ ...emptyBatteryForm, name: `Battery ${savedBatteries.length + 1}` })
+    setBatteryForm({ ...emptyBatteryForm, vehicleType: batteryForm.vehicleType, name: `Battery ${savedBatteries.length + 1}` })
     setProfileMessage('')
   }
 
@@ -1639,7 +1664,7 @@ function App() {
     setEvProfileMode('choose')
     setEvProfileSearch('')
     setEvProfileReviewed(false)
-    setBatteryForm({ ...emptyBatteryForm, name: `Battery ${savedBatteries.length + 1}` })
+    setBatteryForm({ ...emptyBatteryForm, vehicleType: batteryForm.vehicleType, name: `Battery ${savedBatteries.length + 1}` })
     setProfileMessage('')
   }
 
@@ -1783,6 +1808,8 @@ function App() {
 
                           <div className="my-order-details">
                             <h3>{booking.station?.name || 'Charging Station'}</h3>
+                            {booking.chargingPointName && <p>Charging point: {booking.chargingPointName}{booking.pricePerKWh != null ? ` · ₹${booking.pricePerKWh}/kWh` : ''}</p>}
+                            <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
 
                             <p>
                               {new Date(`${booking.date}T00:00:00`).toLocaleDateString(
@@ -2042,6 +2069,7 @@ function App() {
                               <h3>
                                 {booking.station?.name || 'Charging Station'}
                               </h3>
+                              <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
 
                               <p>
                                 {formatDate(booking.date)}
@@ -2113,6 +2141,7 @@ function App() {
               <div className="host-dashboard">
                 <h2>Host Dashboard</h2>
                 <p>Make your charger available to local EV drivers and manage your station details here.</p>
+                <HostChargeGuard />
 
                 <button
                   type="button"
@@ -2172,6 +2201,7 @@ function App() {
                       >
                         <div className="host-station-card-details">
                           <h4>{station.name}</h4>
+                          <StationPointManager station={station} onSaved={fetchHostedStations} />
 
                           <p>
                             <strong>Address:</strong> {station.address || 'Not provided'}
@@ -2210,7 +2240,7 @@ function App() {
 
                           <p>
                             <strong>Pricing:</strong>{' '}
-                            {describeStationPricing(station.pricing)}
+                            {station.pointBookingEnabled ? 'Per-point tariffs — see charging points above.' : describeStationPricing(station.pricing)}
                           </p>
 
                           <p>
@@ -2238,6 +2268,9 @@ function App() {
                               const [openingTime = '09:00', closingTime = '21:00'] = (station.openingHours || '').split('-')
                               setHostStationForm({
                                 ...emptyHostStationForm,
+                                chargingNetwork: station.chargingNetwork || '',
+                                otherNetworkName: station.otherNetworkName || '',
+                                chargingPoints: station.chargers.map((point, i) => ({ ...point, _id: undefined, name: point.name || `Charging Point ${i + 1}`, pricePerKWh: point.pricePerKWh ?? station.pricing?.pricePerKWh ?? 0 })),
                                 name: station.name || '',
                                 address: station.address || '',
                                 area: station.area || '',
@@ -2479,78 +2512,7 @@ function App() {
                         />
                       </label>
 
-                      <label>
-                        Charger Type
-                        <select
-                          value={hostStationForm.chargerType}
-                          onChange={(event) =>
-                            setHostStationForm({ ...hostStationForm, chargerType: event.target.value })
-                          }
-                        >
-                          <option value="AC">AC</option>
-                          <option value="DC">DC</option>
-                        </select>
-                      </label>
-
-                      <label>
-                        Connector Types
-                        <input
-                          type="text"
-                          value={(hostStationForm.connectorTypes || []).join(', ')}
-                          placeholder="Type 2, CCS2"
-                          onChange={(event) =>
-                            setHostStationForm({
-                              ...hostStationForm,
-                              connectorTypes: event.target.value
-                                .split(',')
-                                .map((item) => item.trim())
-                                .filter(Boolean)
-                            })
-                          }
-                        />
-                      </label>
-
-                      <label>
-                        Power Output (kW) *
-                        <input
-                          type="number"
-                          required
-                          min="0.1"
-                          step="0.1"
-                          value={hostStationForm.powerOutputKW}
-                          onChange={(event) =>
-                            setHostStationForm({ ...hostStationForm, powerOutputKW: event.target.value })
-                          }
-                        />
-                      </label>
-
-                      <label>
-                        Total Ports *
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          step="1"
-                          value={hostStationForm.totalPorts}
-                          onChange={(event) =>
-                            setHostStationForm({ ...hostStationForm, totalPorts: event.target.value })
-                          }
-                        />
-                      </label>
-
-                      <label>
-                        Price per kWh *
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          step="0.01"
-                          value={hostStationForm.pricePerKwh}
-                          onChange={(event) =>
-                            setHostStationForm({ ...hostStationForm, pricePerKwh: event.target.value })
-                          }
-                        />
-                      </label>
+                      <ChargingPointEditor value={hostStationForm} onChange={setHostStationForm} />
 
                       <label>
                         Latitude
@@ -2845,6 +2807,7 @@ function App() {
                     <div className="consumer-info profile-item-card" key={battery.id}>
                       <p><strong>{battery.name}</strong></p>
                       <p>{battery.vehicleMake} {battery.vehicleModel}</p>
+                      <p>{battery.vehicleType === 'bike' ? 'Electric Bike' : 'Electric Car'}{battery.batteryVoltage ? ` · ${battery.batteryVoltage} V` : ''}</p>
                       <p>{battery.capacityKwh} kWh · {battery.batteryChemistry || 'Other/Unknown'}</p>
                       <p>Connectors: {(battery.connectorTypes || []).join(', ') || battery.connectorType || 'Not specified'}</p>
                       <p>Maximum AC: {battery.maxAcChargingPowerKw ? `${battery.maxAcChargingPowerKw} kW` : 'Not supported / not specified'} · Maximum DC: {battery.maxDcChargingPowerKw ? `${battery.maxDcChargingPowerKw} kW` : 'Not supported / not specified'}</p>
@@ -2857,6 +2820,8 @@ function App() {
                               name: battery.name,
                               vehicleMake: battery.vehicleMake,
                               vehicleModel: battery.vehicleModel,
+                              vehicleType: battery.vehicleType || 'car',
+                              batteryVoltage: battery.batteryVoltage ?? '',
                               capacityKwh: battery.capacityKwh,
                               batteryChemistry: battery.batteryChemistry || 'Other/Unknown',
                               connectorTypes: battery.connectorTypes?.length ? battery.connectorTypes : (battery.connectorType ? [battery.connectorType] : []),
@@ -2890,7 +2855,8 @@ function App() {
                   <form onSubmit={handleSaveBattery}>
                     <h4>{editingBatteryId ? 'Edit Battery' : 'Add Battery'}</h4>
 
-                    {!editingBatteryId && (
+                    <VehicleTypeSelector value={batteryForm.vehicleType} onChange={(vehicleType) => { if (vehicleType === batteryForm.vehicleType) return; setBatteryForm({ ...(editingBatteryId ? batteryForm : emptyBatteryForm), vehicleType }); setSelectedEvProfileId(''); setSelectedEvVariantId(''); setEvProfileMode('choose'); setEvProfileSearch(''); setEvProfileReviewed(false) }} />
+                    {!editingBatteryId && batteryForm.vehicleType && (
                       <section className="ev-profile-picker" aria-label="Predefined EV profiles">
                         {evProfileMode === 'profile' && selectedEvProfile ? (
                           <div className="ev-profile-selected" aria-live="polite">
@@ -2973,7 +2939,7 @@ function App() {
                                 <h5>Choose your EV</h5>
                                 <p>Pick a model to prefill the details we can verify. You can edit every field.</p>
                               </div>
-                              <button type="button" className="ev-profile-browse" onClick={chooseCustomEv}>Other / Add Custom EV</button>
+                              <button type="button" className="ev-profile-browse" onClick={chooseCustomEv}>Add Battery Manually</button>
                             </div>
                             <label className="ev-profile-search">
                               <span className="sr-only">Search EV profiles</span>
@@ -2987,14 +2953,15 @@ function App() {
                               />
                             </label>
                             <div className="ev-profile-options">
-                              {EV_BATTERY_PROFILES.filter((profile) => `${profile.make} ${profile.model} ${profile.searchTerms.join(' ')}`.toLowerCase().includes(evProfileSearch.trim().toLowerCase())).map((profile) => (
+                              {availableVehicleProfiles.filter((profile) => `${profile.make} ${profile.model} ${profile.searchTerms.join(' ')}`.toLowerCase().includes(evProfileSearch.trim().toLowerCase())).map((profile) => (
                                 <button type="button" className="ev-profile-option" key={profile.id} onClick={() => chooseEvProfile(profile)}>
+                                  {profile.vehicleType === 'bike' && <BikeIllustration />}
                                   <span className="ev-profile-option-top"><strong>{profile.make} {profile.model}</strong><span>{profile.verificationStatus === 'unverified' ? 'Check specs' : 'Profile'}</span></span>
                                   <span className="ev-profile-option-summary">{profile.summary}</span>
                                   <span className="ev-profile-option-chemistry">Chemistry: {profile.batteryChemistry === 'LFP' ? 'LFP (manufacturer listed)' : 'Not confirmed'}</span>
                                 </button>
                               ))}
-                              {EV_BATTERY_PROFILES.filter((profile) => `${profile.make} ${profile.model} ${profile.searchTerms.join(' ')}`.toLowerCase().includes(evProfileSearch.trim().toLowerCase())).length === 0 && (
+                              {availableVehicleProfiles.filter((profile) => `${profile.make} ${profile.model} ${profile.searchTerms.join(' ')}`.toLowerCase().includes(evProfileSearch.trim().toLowerCase())).length === 0 && (
                                 <p className="ev-profile-empty">No matching model. Use “Other / Add Custom EV” to continue manually.</p>
                               )}
                             </div>
@@ -3003,6 +2970,8 @@ function App() {
                       </section>
                     )}
 
+                    {(editingBatteryId || (batteryForm.vehicleType && evProfileMode !== 'choose')) && <>
+                    <div className="form-group"><label htmlFor="battery-voltage">Battery voltage (V, optional)</label><input id="battery-voltage" type="number" min="0.1" step="any" value={batteryForm.batteryVoltage ?? ''} onChange={(event) => setBatteryForm((current) => ({ ...current, batteryVoltage: event.target.value }))} /></div>
                     {[
                       ['name', 'Battery profile name', 'text'],
                       ['vehicleMake', 'Vehicle make', 'text'],
@@ -3071,6 +3040,7 @@ function App() {
                       </div>
                     </div>
 
+                    <div className="form-group"><label htmlFor="exact-battery-connectors">Exact connector names (edit or add manufacturer-specific interfaces)</label><input id="exact-battery-connectors" value={batteryForm.connectorTypes.join(",")} onChange={(event) => setBatteryForm((current) => ({ ...current, connectorTypes: event.target.value.split(",") }))} /><small>Use the connector specified by your charger manufacturer. Generic “Other” does not establish booking compatibility.</small></div>
                     <p className="message">Enter your vehicle’s charging limits, not the station’s output power. Unknown or variant-specific limits may be left blank; estimates for that charging mode will stay unavailable until you confirm the value.</p>
 
                     <div className="form-group">
@@ -3102,6 +3072,7 @@ function App() {
                     <button type="submit" className="button button-primary">
                       {editingBatteryId ? 'Update Battery' : 'Save Battery'}
                     </button>
+                    </>}
                     <button
                       type="button"
                       className="button button-secondary"
@@ -3194,6 +3165,10 @@ function App() {
                         </button>
                       </div>
                       <div className="booking-controls" aria-label="Charging preferences" style={{ marginTop: 0, marginBottom: 0, paddingTop: '10px', paddingBottom: '10px', borderTop: 0, borderRadius: '0 0 14px 14px' }}>
+                        <label className="booking-control">
+                          <span>Station vehicle facilities</span>
+                          <select aria-label="Filter stations by vehicle category" value={stationVehicleFilter} onChange={(e) => { setStationVehicleFilter(e.target.value); setSelectedStationId(null); setSelectedTimeSlot(null) }}><option value="all">Cars and bikes</option><option value="car">Electric Car</option><option value="bike">Electric Bike</option></select>
+                        </label>
                         <label className="booking-control booking-date-control">
                           <span>Charging Date</span>
                           <input
@@ -3271,7 +3246,7 @@ function App() {
                       <div className="booking-results-empty" role="alert"><h2>Charging stations unavailable</h2><p>{stationsError}</p><button type="button" className="button button-primary" onClick={async () => { setStationsLoading(true); setStationsError(''); try { const response = await fetch('/api/charging-stations'); const data = await response.json().catch(() => ({})); if (!response.ok || data.success === false) throw new Error(data.message || 'Request failed'); setChargingStations(Array.isArray(data.stations) ? data.stations : []) } catch (error) { console.error('Charging stations retry failed:', error); setStationsError('Could not load charging stations. Check that the backend is running and try again.') } finally { setStationsLoading(false) } }}>Try again</button></div>
                     ) : (
                       (() => {
-                        const compatibleStations = chargingStations.map((station) => ({ station, estimate: getStationEstimate(station, selectedBookingBattery, initialCharge, finalCharge, selectedBookingAddress) })).filter((item) => item.estimate && stationIsAvailable(item.station))
+                        const compatibleStations = chargingStations.map((station) => ({ station, estimate: getStationEstimate(station, selectedBookingBattery, initialCharge, finalCharge, selectedBookingAddress) })).filter((item) => item.estimate && stationIsAvailable(item.station) && (stationVehicleFilter === 'all' || item.station.chargers.some((point) => (point.vehicleType || 'car') === stationVehicleFilter)))
                         const sortedStations = [...compatibleStations].sort((a, b) => {
                           for (const filter of bookingFilters) {
                             if (filter === 'distance') {
@@ -3286,7 +3261,11 @@ function App() {
                         })
                         const selectedStation = sortedStations.find(({ station }) => (station._id || station.stationCode) === selectedStationId)
                         if (selectedStation) {
-                          const { station, estimate } = selectedStation
+                          const parentStation = selectedStation.station
+                          const compatiblePoints = parentStation.pointBookingEnabled ? parentStation.chargers.filter((p) => pointCompatible(p, selectedBookingBattery)) : []
+                          const selectedPoint = compatiblePoints.find((p) => String(p._id) === selectedChargingPointId && p.availability === 'available') || compatiblePoints.find((p) => p.availability === 'available')
+                          const station = selectedPoint ? pointView(parentStation, selectedPoint) : parentStation
+                          const estimate = selectedPoint ? getStationEstimate(station, selectedBookingBattery, initialCharge, finalCharge, selectedBookingAddress) : selectedStation.estimate
                           const stationPrice = station.pricing?.pricingModel === 'per_kwh' ? `₹${station.pricing?.pricePerKWh ?? 0}/kWh` : station.pricing?.pricingModel === 'per_minute' ? `₹${station.pricing?.pricePerMinute ?? 0}/minute` : station.pricing?.pricingModel === 'per_session' ? `₹${station.pricing?.sessionFee ?? 0}/session` : 'Variable tariff'
                           const availableSlotWindows = getAvailableSlotWindows(
                             station,
@@ -3308,6 +3287,13 @@ function App() {
                               <div className="station-details-summary">
                                 <div className="station-details-summary-main">
                                   <h2>{station.name}</h2>
+                                  <p>Network: {station.chargingNetwork === 'Other' ? station.otherNetworkName : station.chargingNetwork || 'Independent / unspecified'}</p>
+                                  {station.pointBookingEnabled && <label className="point-selector">Choose a compatible charging point
+                                    <select value={String(selectedPoint?._id || '')} onChange={(event) => { setSelectedChargingPointId(event.target.value); setSelectedTimeSlot(null); setBookingModalDraft(null) }}>
+                                      {compatiblePoints.map((point) => <option key={point._id} value={String(point._id)} disabled={point.availability !== 'available'}>{point.name} · {point.vehicleType} · {point.powerOutputKW} kW {point.chargingMode} · {point.connectorTypes.join(', ')} · ₹{point.pricePerKWh}/kWh · {point.availability !== 'available' ? point.availability : point.occupied ? 'Occupied now; choose a future slot' : 'Available'}</option>)}
+                                    </select>
+                                    <small>Filtered for your saved {selectedBookingBattery?.vehicleType === 'bike' ? 'electric bike' : 'electric car'}. Each point has separate time slots.</small>
+                                  </label>}
                                   <p className="station-details-address"><span aria-hidden="true">📍</span> {station.address}</p>
                                   <div className="station-details-facts">
                                     <div className="station-details-fact"><span className="station-details-fact-icon" aria-hidden="true">⚡</span><div><strong>{estimate.charger.powerOutputKW} kW {estimate.charger.chargingMode}</strong><small>Charger Power</small></div></div>
@@ -3423,6 +3409,7 @@ function App() {
                                             windowEndTime: slot.endTime,
                                             date: slot.date,
                                             stationId: stationKey,
+                                            chargingPointId: selectedPoint?._id || null,
                                             stationName: station.name,
                                             requiredMinutes,
                                             startTime: slot.startTime,
@@ -3445,9 +3432,9 @@ function App() {
                               <button
                                 type="button"
                                 className="station-details-book-button"
-                                disabled={!selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode) || bookingInProgress}
+                                disabled={!selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode) || (station.pointBookingEnabled && String(selectedTimeSlot.chargingPointId) !== String(selectedPoint?._id)) || bookingInProgress}
                                 onClick={async () => {
-                                  if (!selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode)) return
+                                  if (!selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode) || (station.pointBookingEnabled && String(selectedTimeSlot.chargingPointId) !== String(selectedPoint?._id))) return
                                   setBookingInProgress(true)
                                   try {
                                     const response = await fetch('/api/bookings', {
@@ -3456,6 +3443,7 @@ function App() {
                                       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
                                       body: JSON.stringify({
                                         stationId: String(station._id),
+                                        ...(station.pointBookingEnabled ? { chargingPointId: estimate.charger._id } : {}),
                                         date: selectedTimeSlot.date,
                                         startTime: selectedTimeSlot.startTime,
                                         endTime: selectedTimeSlot.endTime,
@@ -3559,6 +3547,7 @@ function App() {
                                         durationMinutes: duration,
                                         requiredMinutes: bookingModalDraft.requiredMinutes,
                                         stationId: bookingModalDraft.stationId,
+                                        chargingPointId: bookingModalDraft.chargingPointId,
                                         stationName: bookingModalDraft.stationName,
                                       })
                                       setBookingModalDraft(null)
@@ -3578,7 +3567,7 @@ function App() {
                             return <article key={stationId} className="charging-station-card">
                               <div className={`charging-station-card-image${station.imageUrl ? '' : ' charging-station-card-image-fallback'}`}>{station.imageUrl ? <img src={station.imageUrl} alt={`${station.name} charging station`} /> : <img src="/charging-hero.png" alt="Electric vehicle charging" />}</div>
                               <div className="charging-station-card-description">
-                                <h3>{station.name}</h3>
+                                <h3>{station.name}</h3><p>{station.chargingNetwork === 'Other' ? station.otherNetworkName : station.chargingNetwork || 'Independent / unspecified'}{station.pointBookingEnabled ? ` · ${station.chargers.length} charging points` : ''}</p>
                                 <p className="charging-station-card-address">{station.address}</p>
                                 <div className="charging-station-card-facts">
                                   <span>📍 {roadDistancesKm[String(station._id || station.stationCode || '')] == null ? 'Road distance unavailable' : `${selectedBookingAddress?.coordinatesApproximate ? '≈ ' : ''}${roadDistancesKm[String(station._id || station.stationCode || '')].toFixed(1)} km driving`}</span>

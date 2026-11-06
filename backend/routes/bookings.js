@@ -3,6 +3,9 @@ import mongoose from 'mongoose'
 import Booking from '../models/Booking.js'
 import ChargingStation from '../models/ChargingStation.js'
 import Consumer from '../models/consumer.js'
+import { pointCompatible } from '../../shared/chargingPoints.js'
+import { baseWindows, reject } from '../services/chargingPoints.js'
+import { assertBookable, eligibleBooking, expireProbation, healthState } from '../services/chargeGuard.js'
 
 const router = express.Router()
 
@@ -201,7 +204,7 @@ router.get('/my', async (req, res) => {
 
         const [bookings, consumer] = await Promise.all([
             Booking.find({ consumerId })
-                .populate('station', 'name address stationCode')
+                .populate('station', 'name address stationCode chargeGuard')
                 .sort({ startAt: 1 }),
 
             Consumer.findOne({ _id: consumerId }).select('batteries'),
@@ -217,6 +220,8 @@ router.get('/my', async (req, res) => {
 
             return {
                 ...bookingData,
+                chargeGuardReportEligible: eligibleBooking(booking, consumerId),
+                stationHealth: booking.station ? healthState(booking.station) : null,
                 initialCharge: booking.initialCharge,
                 finalCharge: booking.finalCharge,
                 battery: battery
@@ -347,6 +352,9 @@ router.post('/', async (req, res) => {
                     throw error
                 }
 
+                assertBookable(station)
+                await expireProbation(station, session)
+
                 if (station.status !== 'available') {
                     const error = new Error(
                         'This charging station is not currently available.'
@@ -365,9 +373,18 @@ router.post('/', async (req, res) => {
                     throw error
                 }
 
+                let point = null
+                if (station.pointBookingEnabled) {
+                    if (!mongoose.isValidObjectId(req.body.chargingPointId)) reject('Select a charging point.')
+                    point = station.chargers.id(req.body.chargingPointId)
+                    if (!point) reject('Charging point not found at this station.', 404)
+                    if (point.availability !== 'available') reject('This charging point is unavailable.', 409)
+                    if (!pointCompatible(point, battery)) reject('This charging point is not compatible with your vehicle.')
+                } else if ((battery.vehicleType || 'car') !== 'car') reject('This legacy station has not confirmed bike compatibility.')
+
                 requiredMinutes = calculateRequiredChargingMinutes(
                     battery,
-                    station,
+                    point ? { chargers: [point] } : station,
                     Number(initialCharge),
                     Number(finalCharge)
                 )
@@ -418,7 +435,7 @@ router.post('/', async (req, res) => {
                     )
                 })
 
-                const fitsAvailableSlot = availableSlots.some((slot) => (
+                const fitsAvailableSlot = point ? baseWindows(station, date).some(([start, end]) => startTime >= start && endTime <= end) : availableSlots.some((slot) => (
                     startMinutes >= timeToMinutes(slot.startTime) &&
                     endMinutes <= timeToMinutes(slot.endTime)
                 ))
@@ -433,6 +450,7 @@ router.post('/', async (req, res) => {
 
                 const stationConflict = await Booking.findOne({
                     station: station._id,
+                    ...(point ? { $or: [{ chargingPointId: point._id }, { chargingPointId: null }] } : {}),
                     date,
                     status: 'confirmed',
                     startAt: { $lt: requestedEnd },
@@ -468,6 +486,9 @@ router.post('/', async (req, res) => {
                 const [booking] = await Booking.create(
                     [{
                         station: station._id,
+                        chargingPointId: point?._id || null,
+                        chargingPointName: point?.name || "",
+                        ...(point?.pricePerKWh != null ? { pricePerKWh: point.pricePerKWh } : {}),
                         consumerId,
                         batteryId,
                         initialCharge,
@@ -483,6 +504,7 @@ router.post('/', async (req, res) => {
                     { session }
                 )
 
+                if (!point) {
                 const updatedSlots = []
 
                 for (const slot of station.timeSlots) {
@@ -553,6 +575,7 @@ router.post('/', async (req, res) => {
                     )
                 }
 
+                }
                 createdBooking = booking
             })
 
@@ -660,6 +683,7 @@ router.delete('/:bookingId', async (req, res) => {
                 return
             }
 
+            if (!booking.chargingPointId) {
             const bookingDate = booking.date
             const startMinutes = timeToMinutes(booking.startTime)
             const endMinutes = timeToMinutes(booking.endTime)
@@ -725,6 +749,9 @@ router.delete('/:bookingId', async (req, res) => {
             })
 
             await station.save({ session })
+            } else {
+                await ChargingStation.updateOne({ _id: station._id }, { $inc: { __v: 1 } }, { session })
+            }
 
             // Update just the status; do not validate unrelated
             // required fields such as initialCharge/finalCharge.

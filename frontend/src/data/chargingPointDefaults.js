@@ -1,0 +1,1 @@
+export const newChargingPoint = (number = 1) => ({ name: `Charging Point ${number}`, vehicleType: 'car', chargingMode: 'AC', powerOutputKW: '7.4', pricePerKWh: '0', totalPorts: 1, availability: 'available', connectorTypes: ['Type 2'], supportedVehicles: [] })

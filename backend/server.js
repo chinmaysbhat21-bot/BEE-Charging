@@ -9,6 +9,7 @@ import MongoStore from 'connect-mongo'
 import consumerAuthRoutes from './routes/consumerAuth.js'
 import chargingStationsRoutes from './routes/chargingStations.js'
 import bookingsRoutes from './routes/bookings.js'
+import chargeGuardRoutes from './routes/chargeGuard.js'
 
 dotenv.config()
 
@@ -44,6 +45,7 @@ const PORT = process.env.PORT || 5001
 app.use('/api/consumer/auth', consumerAuthRoutes)
 app.use('/api/charging-stations', chargingStationsRoutes)
 app.use('/api/bookings', bookingsRoutes)
+app.use('/api/chargeguard', chargeGuardRoutes)
 
 mongoose
   .connect(process.env.MONGODB_URI)

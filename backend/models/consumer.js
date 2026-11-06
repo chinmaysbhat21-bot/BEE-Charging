@@ -49,6 +49,8 @@ const addressSchema = new mongoose.Schema(
 
 const batterySchema = new mongoose.Schema(
   {
+    vehicleType: { type: String, enum: ["bike", "car"], default: "car" },
+    batteryVoltage: { type: Number, min: 0.1 },
     name: {
       type: String,
       required: true,
