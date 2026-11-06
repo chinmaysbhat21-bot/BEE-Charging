@@ -2018,7 +2018,7 @@ function App() {
               ) : (
                 orderGroups.map(group => {
                   const orders = myBookings.filter(booking => {
-                    if (booking.status !== 'confirmed' || booking.sessionOutcome === 'failed') return false
+                    if (booking.status !== 'confirmed' || ['failed', 'expired'].includes(booking.sessionOutcome)) return false
                     if (booking.sessionOutcome === 'completed') return group.id === 'completed'
                     return group.id === (orderSchedule(booking).start > orderNow ? 'upcoming' : 'current')
                   })
@@ -2241,7 +2241,7 @@ function App() {
 
                   const historyBookings = myBookings
                     .filter((booking) => {
-                      if (booking.status === 'cancelled' || ['completed', 'failed'].includes(booking.sessionOutcome)) return true
+                      if (booking.status === 'cancelled' || ['completed', 'failed', 'expired'].includes(booking.sessionOutcome)) return true
 
                       return (
                         booking.status === 'confirmed' &&
@@ -2378,7 +2378,7 @@ function App() {
                                 : booking.sessionOutcome === 'completed' ? 'history-status-completed' : ''
                                 }`}
                             >
-                              {isCancelled ? 'Cancelled' : booking.sessionOutcome === 'completed' ? 'Completed' : booking.sessionOutcome === 'failed' ? 'Failed' : 'Awaiting confirmation'}
+                              {isCancelled ? 'Cancelled' : booking.sessionOutcome === 'completed' ? 'Completed' : booking.sessionOutcome === 'failed' ? 'Failed' : booking.sessionOutcome === 'expired' ? 'Expired — charging not verified' : 'Awaiting confirmation'}
                             </span>
                           </article>
                         )

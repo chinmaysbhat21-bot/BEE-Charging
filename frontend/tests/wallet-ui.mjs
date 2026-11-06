@@ -57,7 +57,7 @@ try {
   await page.clock.setFixedTime(new Date(booking.endAt).getTime() + 1000)
   await expect(current.getByText('Awaiting completion confirmation').first()).toBeVisible()
   await expect(finished.getByText('Wallet Dock', { exact: false })).toHaveCount(0)
-  await Booking.updateOne({ _id: booking._id }, { $set: { startAt: new Date(Date.now() - 7200000), endAt: new Date(Date.now() - 3600000) } })
+  await Booking.updateOne({ _id: booking._id }, { $set: { startAt: new Date(Date.now() - 7200000), endAt: new Date(Date.now() - 60000) } })
   page.on('dialog', dialog => dialog.accept())
   await expect(page.getByRole('button', { name: 'Confirm successful charging' })).toHaveCount(0)
   process.env.CHARGING_EVENT_TOKEN = 'test-charger-event-token-at-least-32-characters'

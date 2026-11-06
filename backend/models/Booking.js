@@ -11,7 +11,7 @@ const bookingSchema = new mongoose.Schema(
             hostId: { type: mongoose.Schema.Types.ObjectId, ref: 'Consumer' },
             status: { type: String, enum: ['RESERVED', 'PAID', 'REFUNDED', 'RELEASED'] },
         },
-        sessionOutcome: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
+        sessionOutcome: { type: String, enum: ['pending', 'completed', 'failed', 'expired'], default: 'pending' },
         completedAt: Date,
         chargingPointId: { type: mongoose.Schema.Types.ObjectId, default: null },
         chargingPointName: { type: String, default: '' },

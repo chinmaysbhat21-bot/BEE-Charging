@@ -42,7 +42,7 @@ const book = (index = 0, key = 'wallet-booking-request', extra = {}) => driver.p
 const token = 'test-charger-event-token-at-least-32-characters'
 process.env.CHARGING_EVENT_TOKEN = token
 const complete = (id, successful = true) => request(base).post(`/api/wallet/bookings/${id}/complete`).set('Authorization', 'Bearer ' + token).send({ successful })
-async function ended(id) { await Booking.updateOne({ _id: id }, { $set: { startAt: new Date(Date.now() - 7200000), endAt: new Date(Date.now() - 3600000) } }) }
+async function ended(id) { await Booking.updateOne({ _id: id }, { $set: { startAt: new Date(Date.now() - 7200000), endAt: new Date(Date.now() - 60000) } }) }
 
 test('consumer and host balances are independent, private and initially zero', async () => {
   const consumerWallet = (await driver.get('/api/wallet')).body.wallet
@@ -133,6 +133,31 @@ test('ledger mutation is blocked and state survives database reconnect', async (
   const uri = mongoose.connection.client.s.url
   await mongoose.disconnect(); await mongoose.connect(uri)
   assert.equal(await balance(), 12345); assert.equal((await Ledger.findOne()).amountInPaise, 12345)
+})
+
+test('overdue bookings release reservations and reject late settlement', async () => {
+  const { expireOverdueBookings } = await import('../services/bookingExpiry.js')
+  await recharge()
+  const first = await book()
+  const second = await book(1, 'expiry-late-outcome')
+  assert.equal(first.status, 201)
+  assert.equal(second.status, 201)
+  const ids = [first.body.booking._id, second.body.booking._id]
+  const now = Date.now()
+  await Booking.updateMany({ _id: { $in: ids } }, {
+    startAt: new Date(now - 7200000),
+    endAt: new Date(now - 3660000),
+  })
+  const late = await complete(ids[0])
+  assert.equal(late.status, 409)
+  assert.match(late.body.message, /expired/)
+  await expireOverdueBookings()
+  await expireOverdueBookings()
+  const bookings = await Booking.find({ _id: { $in: ids } })
+  assert.ok(bookings.every(booking => booking.sessionOutcome === 'expired' && booking.payment.status === 'RELEASED'))
+  assert.equal((await driver.get('/api/wallet')).body.wallet.reservedInPaise, 0)
+  assert.equal(await balance(), 10000)
+  assert.equal(await Ledger.countDocuments({ type: { $in: ['PAYMENT', 'EARNING'] } }), 0)
 })
 
 test('a reported failed paid session never earns a host credit', async () => {

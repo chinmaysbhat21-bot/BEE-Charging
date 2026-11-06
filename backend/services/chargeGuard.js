@@ -16,7 +16,7 @@ export function assertBookable(station) {
     if (['PAUSED', 'SUSPENDED'].includes(healthState(station))) fail(409, 'ChargeGuard has paused reservations for this dock or legacy station. Existing bookings are preserved.')
 }
 
-function reportWindow(booking) {
+export function reportWindow(booking) {
     const start = new Date(booking.startAt).getTime()
     const end = new Date(booking.endAt).getTime()
     const wallStart = `${booking.date}T${booking.startTime}:00`

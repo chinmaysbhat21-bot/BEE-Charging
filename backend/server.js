@@ -12,6 +12,7 @@ import consumerAuthRoutes from './routes/consumerAuth.js'
 import chargingStationsRoutes from './routes/chargingStations.js'
 import bookingsRoutes from './routes/bookings.js'
 import chargeGuardRoutes from './routes/chargeGuard.js'
+import { expireOverdueBookings } from './services/bookingExpiry.js'
 
 dotenv.config()
 
@@ -57,6 +58,16 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB')
+    const runExpiry = async () => {
+      try {
+        await expireOverdueBookings()
+      } catch (error) {
+        console.error('Booking expiry sweep failed:', error.message)
+      } finally {
+        setTimeout(runExpiry, 30_000).unref()
+      }
+    }
+    void runExpiry()
   })
   .catch((error) => {
     console.error('MongoDB connection failed:', error.message)
