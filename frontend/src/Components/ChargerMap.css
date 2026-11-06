@@ -1,0 +1,475 @@
+.bee-discovery { display:grid; gap:12px; min-width:0; }
+.bee-discovery-tools { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
+.bee-discovery-tools label:first-child { flex:1 1 230px; display:grid; gap:5px; font-weight:700; }
+.bee-discovery-tools input[type=search] { width:100%; padding:10px 12px; border:1px solid var(--ev-line); background:var(--ev-white); }
+.bee-discovery-filter { display:flex; gap:8px; align-items:center; min-height:48px; }
+.bee-map-stage { position:relative; overflow:hidden; border-radius:18px; background:var(--ev-mist); }
+.bee-map-canvas { height:clamp(300px,48vh,520px); }
+.bee-map-locate,.bee-map-loading { position:absolute; top:12px; left:12px; margin:0; padding:8px 14px; border:1px solid var(--ev-line); border-radius:12px; background:var(--ev-white); color:var(--ev-ink); }
+.bee-map-note { margin:0; color:var(--ev-muted); }
+.bee-map-sheet { border:1px solid var(--ev-soft); border-radius:18px; background:var(--ev-white); min-width:0; }
+.bee-sheet-handle { display:grid; justify-items:center; gap:5px; width:100%; border:0; border-radius:18px; background:var(--ev-white); font-weight:700; padding:8px; touch-action:none; }
+.bee-sheet-handle::before { content:''; width:32px; height:4px; border-radius:99px; background:var(--ev-line); }
+.bee-map-cards { display:grid; gap:10px; padding:10px; }
+.bee-map-sheet[data-map=true] .bee-map-cards { max-height:245px; overflow:auto; overscroll-behavior:contain; }
+.bee-map-sheet[data-map=true][data-expanded=true] .bee-map-cards { max-height:min(65dvh,620px); }
+.bee-map-result { border:2px solid transparent; border-radius:18px; min-width:0; }
+.bee-map-result[data-selected=true] { border-color:var(--ev-ink); }
+.bee-map-select { width:100%; text-align:left; padding:8px 12px; border:0; border-radius:12px; background:var(--ev-mist); color:var(--ev-ink); font-weight:700; }
+.bee-map-result[data-selected=true] .bee-map-select { background:var(--ev-lime); }
+.bee-map-marker { display:grid; place-items:center; width:34px; height:34px; border:2px solid var(--ev-ink); border-radius:12px 12px 12px 3px; background:var(--ev-lime); color:var(--ev-ink); box-shadow:0 0 0 1px var(--ev-white); transition:transform .15s ease; }
+.bee-map-marker svg { width:21px; height:21px; }
+.bee-map-marker[data-available=false] { background:var(--ev-soft); color:var(--ev-muted); }
+.bee-map-marker[data-selected=true] { transform:scale(1.16); box-shadow:0 0 0 2px var(--ev-white); }
+.bee-map-canvas { isolation:isolate; } .bee-map-locate,.bee-map-loading { z-index:1; } .bee-map-locate { left:auto; right:12px; }
+
+.bee-discovery { gap:16px; }
+.bee-discovery-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.bee-discovery-heading h2 { margin:0 0 4px; }
+.bee-discovery-heading p { margin:0; color:var(--ev-muted); font-size:14px; }
+.bee-discovery-heading .bee-map-locate { position:static; width:auto; margin:0; padding-inline:16px; min-height:48px; }
+.bee-discovery-tools { padding:12px 14px; border-radius:16px; background:var(--ev-mist); }
+.bee-discovery-filter { padding-inline:8px; font-size:14px; }
+.bee-map-stage { border:1px solid var(--ev-line); }
+.bee-map-canvas { height:clamp(250px,38dvh,460px); }
+.bee-sheet-handle { color:var(--ev-ink); border-bottom:1px solid var(--ev-soft); }
+.bee-map-result .charging-station-card { border:0; box-shadow:none; }
+.bee-map-result { border:1px solid var(--ev-soft); background:var(--ev-white); overflow:hidden; }
+.bee-map-select { border-radius:0; font-size:13px; }
+.bee-map-sheet[data-map=true][data-expanded=true] .bee-map-cards { max-height:none; overflow:visible; }
+@media (max-width: 480px) {
+  .bee-discovery-heading { align-items:flex-start; }
+  .bee-discovery-heading .bee-map-locate { width:100%; }
+  .bee-discovery-tools { gap:0; }
+  .bee-discovery-filter { padding-inline:0; }
+  .bee-map-cards { padding:8px; }
+}
+.bee-map-fit { position:absolute; z-index:1; top:10px; right:10px; padding:8px 12px; border:1px solid var(--ev-line); border-radius:12px; background:var(--ev-white); color:var(--ev-ink); font-weight:700; }
+.bee-map-user-dot { box-sizing:border-box; border:2px solid var(--ev-white); border-radius:50%; background:#1677ff; box-shadow:0 0 0 1px #125bc0; }
+
+/* Keep discovery controls in the document flow so the map stays accessible. */
+.book-slot-page:has(.bee-discovery) .booking-sticky-stack {
+  position: relative !important;
+  top: auto !important;
+  box-shadow: none;
+}
+.book-slot-page:has(.bee-discovery) .booking-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.book-slot-page:has(.bee-discovery) .booking-filter-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto !important;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px 14px !important;
+  white-space: nowrap;
+}
+.book-slot-page:has(.bee-discovery) .booking-filter-chip input {
+  position: static;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.bee-discovery {
+  padding-block: 8px;
+}
+.bee-discovery-heading h2 {
+  font-size: 26px;
+  letter-spacing: -.04em;
+}
+.bee-discovery-tools {
+  border: 1px solid var(--ev-soft);
+  background: var(--ev-white);
+  gap: 12px;
+}
+.bee-discovery-tools label:first-child {
+  font-size: 13px;
+  gap: 8px;
+}
+.bee-discovery-tools input[type=search] {
+  background: var(--ev-mist);
+  font-weight: 400;
+}
+.bee-map-sheet {
+  border: 0;
+  background: transparent;
+}
+.bee-sheet-handle {
+  border: 1px solid var(--ev-soft);
+  font-size: 15px;
+  padding: 12px 16px;
+}
+.bee-map-cards {
+  padding: 12px 0;
+  gap: 14px;
+}
+.bee-map-result {
+  border-radius: 16px;
+}
+.bee-map-result .charging-station-card {
+  margin: 0;
+  border-radius: 0;
+  background: var(--ev-white);
+}
+.bee-map-select {
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.bee-map-result[data-selected=true] {
+  border-color: var(--ev-ink);
+  box-shadow: 0 0 0 1px var(--ev-ink);
+}
+.bee-discovery .leaflet-control-zoom a {
+  min-width: 40px;
+  height: 40px;
+  line-height: 40px;
+}
+.bee-discovery .leaflet-control-attribution {
+  font: 11px/1.5 var(--sans);
+}
+.bee-map-fit {
+  font: 600 13px/1.4 var(--sans);
+  box-shadow: var(--ev-shadow);
+}
+.bee-map-note {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--ev-mist);
+  font-size: 14px;
+}
+@media (min-width: 1000px) {
+  .bee-discovery {
+    grid-template-columns: minmax(0, 1.15fr) minmax(340px, 1fr);
+    align-items: start;
+    gap: 20px;
+  }
+  .bee-discovery-heading, .bee-discovery-tools, .bee-map-note {
+    grid-column: 1 / -1;
+  }
+  .bee-map-stage {
+    position: sticky;
+    top: 92px;
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .bee-map-canvas {
+    height: min(65dvh, 620px);
+    min-height: 400px;
+  }
+  .bee-map-sheet {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+  }
+  .bee-map-result .charging-station-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .bee-map-result .charging-station-card-image {
+    width: 64px;
+    height: 76px;
+    min-height: 76px;
+  }
+  .bee-map-result .charging-station-card-description {
+    min-height: 0;
+  }
+  .bee-map-result .charging-station-card-actions {
+    grid-column: 1 / -1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ev-soft);
+  }
+}
+@media (max-width: 999px) {
+  .bee-map-canvas {
+    height: 320px;
+  }
+  .bee-discovery-heading h2 {
+    font-size: 24px;
+  }
+  .bee-discovery-heading .bee-map-locate {
+    width: auto;
+  }
+}
+
+/* Map canvas and its three-position sheet. */
+.book-slot-page:has(.bee-discovery) {
+  padding: 0;
+  display: block;
+}
+.consumer-content:has(.bee-discovery) {
+  padding: 0 !important;
+}
+.discovery-preferences {
+  position: relative;
+  z-index: 20;
+  background: var(--ev-white);
+}
+.discovery-preferences > summary {
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.discovery-preferences[open] {
+  max-height: 65dvh;
+  overflow: auto;
+}
+.book-slot-page:has(.bee-discovery) .booking-results-toolbar {
+  margin: 0;
+  padding: 4px 16px;
+  min-height: 0;
+}
+.book-slot-page:has(.bee-discovery) .booking-results-toolbar > span {
+  font-size: 13px;
+}
+.bee-discovery {
+  position: relative;
+  display: block;
+  padding: 0;
+  height: calc(100dvh - 220px);
+  min-height: 500px;
+  overflow: hidden;
+}
+.bee-discovery .bee-map-stage {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+.bee-discovery .bee-map-canvas {
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+.bee-discovery .bee-discovery-heading {
+  position: absolute;
+  right: 12px;
+  top: 130px;
+  z-index: 2;
+}
+.bee-discovery-heading > div {
+  display: none;
+}
+.bee-discovery-heading .bee-map-locate {
+  background: var(--ev-white);
+  box-shadow: var(--ev-shadow);
+  border: 0;
+}
+.bee-discovery .bee-discovery-tools {
+  position: absolute;
+  inset: 12px 12px auto;
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: grid;
+  gap: 8px;
+}
+.bee-discovery-tools label:first-child {
+  font-size: 0;
+  gap: 0;
+}
+.bee-discovery-tools input[type=search] {
+  background: var(--ev-white);
+  border: 0;
+  box-shadow: var(--ev-shadow);
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+.bee-discovery-filter {
+  justify-self: start;
+  padding: 8px 14px;
+  min-height: 44px;
+  border-radius: 24px;
+  background: var(--ev-white);
+  box-shadow: var(--ev-shadow);
+}
+.bee-discovery-filter:has(input:checked) {
+  background: var(--ev-lime);
+}
+.bee-discovery .bee-map-fit {
+  top: 190px;
+  right: 12px;
+}
+.bee-discovery .leaflet-top {
+  top: 125px;
+}
+.bee-discovery .leaflet-bottom {
+  bottom: 35%;
+}
+.bee-discovery .bee-map-sheet {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  height: 33%;
+  margin: 0;
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--ev-white);
+  box-shadow: 0 -3px 14px rgba(0,0,0,.08);
+  transition: height .2s ease;
+  overflow: hidden;
+}
+.bee-discovery .bee-map-sheet[data-position=half] { height: 52%; }
+.bee-discovery .bee-map-sheet[data-position=expanded] { height: 85%; }
+.bee-discovery .bee-sheet-handle {
+  flex: none;
+  border: 0;
+  border-radius: 0;
+  padding: 9px 16px;
+  min-height: 52px;
+}
+.bee-discovery .bee-map-cards {
+  display: block;
+  padding: 0;
+  overflow: auto !important;
+  max-height: none !important;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.bee-discovery .bee-map-result {
+  border: 0;
+  border-bottom: 1px solid var(--ev-soft);
+  border-radius: 0;
+  box-shadow: none;
+}
+.bee-discovery .bee-map-result[data-selected=true] {
+  box-shadow: inset 3px 0 var(--ev-lime);
+}
+.bee-discovery .bee-map-select {
+  background: transparent;
+  padding: 8px 16px 0;
+  min-height: 34px;
+  color: var(--ev-muted);
+}
+.bee-discovery .charging-station-card {
+  padding: 12px 16px;
+  border-radius: 0;
+}
+.bee-map-marker {
+  width: 30px;
+  height: 34px;
+  border: 1px solid var(--ev-ink);
+  border-radius: 50% 50% 50% 4px;
+  box-shadow: none;
+}
+.bee-map-marker[data-selected=true] {
+  box-shadow: 0 2px 5px rgba(0,0,0,.2);
+}
+.bee-discovery .bee-map-note {
+  position: absolute;
+  top: 115px;
+  left: 12px;
+  max-width: 65%;
+  z-index: 4;
+}
+@media (min-width: 1000px) {
+  .bee-discovery .bee-map-sheet {
+    right: auto;
+    width: 420px;
+  }
+  .bee-discovery .bee-discovery-tools {
+    right: auto;
+    width: 400px;
+  }
+  .bee-discovery .leaflet-bottom { bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bee-discovery .bee-map-sheet { transition: none; }
+}
+.bee-discovery .bee-map-result[data-selected=true] .bee-map-select {
+  background: transparent;
+  color: var(--ev-ink);
+}
+@media (max-width: 800px) {
+  .bee-discovery {
+    height: calc(100dvh - 250px - env(safe-area-inset-bottom));
+    min-height: 340px;
+  }
+  .consumer-content:has(.bee-discovery) {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Native discovery owns the space between the existing app bars. */
+.bee-native .consumer-content:has(.bee-discovery) {
+  padding: 0 !important;
+}
+.bee-native .book-slot-page:has(.bee-discovery) .discovery-preferences {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: 122px;
+  z-index: 25;
+  border-radius: 12px;
+  box-shadow: var(--ev-shadow);
+}
+.bee-native .book-slot-page:has(.bee-discovery) .discovery-preferences > summary {
+  min-height: 44px;
+  padding: 12px;
+  font-size: 12px;
+}
+.bee-native .book-slot-page:has(.bee-discovery) .booking-results-toolbar {
+  position: fixed;
+  top: 172px;
+  left: 12px;
+  z-index: 24;
+  padding: 0;
+}
+.bee-native .book-slot-page:has(.bee-discovery) .booking-results-toolbar > span { display: none; }
+.bee-native .booking-results-toolbar .back-button { min-height: 40px; background: var(--ev-white); }
+.bee-native .bee-discovery {
+  position: fixed;
+  inset: 64px 0 calc(68px + env(safe-area-inset-bottom));
+  height: auto;
+  min-height: 0;
+}
+.bee-native .bee-discovery .bee-discovery-tools {
+  inset: 10px 12px auto;
+}
+.bee-native .bee-discovery-filter {
+  margin-top: 52px;
+  margin-left: 90px;
+  min-height: 40px;
+  font-size: 12px;
+}
+.bee-native .bee-discovery .bee-discovery-heading { top: 164px; right: 12px; }
+.bee-native .bee-discovery .bee-map-fit { top: 218px; }
+.bee-native .bee-discovery .leaflet-top { top: 164px; }
+.bee-native .bee-discovery .bee-map-sheet { width: 100%; }
+.bee-native .bee-discovery .bee-map-result { position: relative; }
+.bee-native .bee-discovery .charging-station-card { padding: 10px 16px 14px; }
+.bee-native .bee-discovery .charging-station-card-image { width: 44px; height: 52px; min-height: 52px; }
+.bee-native .bee-discovery .charging-station-card { grid-template-columns: 44px minmax(0, 1fr); }
+.bee-native .bee-discovery .charging-station-card-description h3 { font-size: 16px; }
+.bee-native .bee-discovery .charging-station-card-description > p { font-size: 12px; }
+.bee-native .bee-discovery .charging-station-card-facts { font-size: 12px; }
+.bee-native .bee-discovery .charging-station-card-actions { padding-top: 8px; }
+.bee-native .bee-discovery .charging-station-view-details { min-height: 44px; }
+.bee-native .book-slot-page:has(.bee-map-sheet[data-position=expanded]) .discovery-preferences,
+.bee-native .book-slot-page:has(.bee-map-sheet[data-position=expanded]) .booking-results-toolbar {
+  visibility: hidden;
+}
+.bee-native .book-slot-page:has(.bee-discovery) .booking-results-toolbar {
+  right: auto;
+  width: auto;
+  background: transparent;
+}

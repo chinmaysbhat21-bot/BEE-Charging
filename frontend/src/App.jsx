@@ -1,4 +1,5 @@
 import { AmenitiesPicker, StationAmenities } from './Components/StationAmenities'
+import ChargerMap from './Components/ChargerMap'
 import { newChargingPoint } from './data/chargingPointDefaults'
 import React, { useEffect, useState } from 'react'
 import './App.css'
@@ -3155,6 +3156,8 @@ function App() {
               {bookSelectionView === 'main' ? (
                 <>
                   {!selectedStationId && (
+                    <details className="discovery-preferences" open={!selectedBookingAddress || !selectedBookingBattery}>
+                    <summary>Address, vehicle &amp; charging preferences</summary>
                     <div
                       className="booking-sticky-stack"
                       style={{
@@ -3270,7 +3273,7 @@ function App() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </div></details>
                   )}
                   <div className="booking-results-scroll" style={{ marginTop: 0, paddingTop: 0 }}>
                     {!selectedBookingAddress || !selectedBookingBattery ? (
@@ -3605,8 +3608,26 @@ function App() {
                           </section>
                         }
                         return <div style={{ display: 'grid', gap: '8px', paddingBottom: '18px', marginTop: 0 }}>
-                          <div className="booking-results-toolbar"><span>{sortedStations.length} {sortedStations.length === 1 ? 'result' : 'results'}</span><button type="button" className="back-button" onClick={async () => { setStationsLoading(true); setStationsError(''); try { const response = await fetch('/api/charging-stations'); const data = await response.json().catch(() => ({})); if (!response.ok || data.success === false) throw new Error(data.message || 'Request failed'); setChargingStations(Array.isArray(data.stations) ? data.stations : []) } catch (error) { console.error('Charging stations refresh failed:', error); setStationsError('Could not refresh charging stations. Check the backend and try again.') } finally { setStationsLoading(false) } }}>Refresh</button></div>
-                          {sortedStations.length === 0 ? <div className="booking-results-empty"><div className="consumer-avatar">🔌</div><h3>No compatible stations found</h3><p>Check the connector types saved in your vehicle profile. These demo stations may not match every vehicle.</p></div> : sortedStations.map(({ station, estimate }) => {
+                          <div className="booking-results-toolbar"><span>Charging stations</span><button type="button" className="back-button" onClick={async () => { setStationsLoading(true); setStationsError(''); try { const response = await fetch('/api/charging-stations'); const data = await response.json().catch(() => ({})); if (!response.ok || data.success === false) throw new Error(data.message || 'Request failed'); setChargingStations(Array.isArray(data.stations) ? data.stations : []) } catch (error) { console.error('Charging stations refresh failed:', error); setStationsError('Could not refresh charging stations. Check the backend and try again.') } finally { setStationsLoading(false) } }}>Refresh</button></div>
+                          <ChargerMap
+                            center={selectedBookingAddress.latitude != null && selectedBookingAddress.longitude != null
+                              ? { lat: Number(selectedBookingAddress.latitude), lng: Number(selectedBookingAddress.longitude) } : null}
+                            rows={sortedStations.map(({ station, estimate }) => {
+                              const coordinates = station.location?.coordinates || station.coordinates
+                              const candidates = station.pointBookingEnabled
+                                ? station.chargers.filter(point => pointCompatible(point, selectedBookingBattery) && pointAvailable(point))
+                                : [null]
+                              const available = candidates.filter(point => {
+                                const view = point ? pointView(station, point) : station
+                                const duration = point ? getStationEstimate(view, selectedBookingBattery, initialCharge, finalCharge, selectedBookingAddress)?.durationMinutes : estimate.durationMinutes
+                                return duration != null && getAvailableSlotWindows(view, duration, selectedBookingDate, myBookings, selectedBookingBattery._id ?? selectedBookingBattery.id).length > 0
+                              }).length
+                              return { station, estimate, available, id: station._id || station.stationCode,
+                                position: Array.isArray(coordinates) && coordinates.length === 2 && coordinates.every(Number.isFinite)
+                                  ? { lat: coordinates[1], lng: coordinates[0] } : null }
+                            })}
+                            empty={<div className="booking-results-empty"><h3>No matching stations</h3><p>Try another area or adjust your search and filters.</p></div>}
+                            renderCard={({ station, estimate }) => {
                             const stationId = station._id || station.stationCode
                             return <article key={stationId} className="charging-station-card">
                               <div className={`charging-station-card-image${station.imageUrl ? '' : ' charging-station-card-image-fallback'}`}>{station.imageUrl ? <img src={station.imageUrl} alt={`${station.name} charging station`} /> : <img src="/charging-hero.png" alt="Electric vehicle charging" />}</div>
@@ -3626,7 +3647,7 @@ function App() {
                                 <button type="button" className="charging-station-view-details" onClick={() => { setSelectedTimeSlot(null); setSelectedStationId(stationId) }}>View Details</button>
                               </div>
                             </article>
-                          })}
+                          }} />
                           {sortedStations.some(({ station }) => station.isDemo) && (
                             <p style={{ margin: 0, color: '#676767', fontSize: '0.78rem' }}>Demo stations and their prices are illustrative; their physical installation is not confirmed.</p>
                           )}
