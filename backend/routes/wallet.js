@@ -6,8 +6,9 @@ import Booking from '../models/Booking.js'
 import Station from '../models/ChargingStation.js'
 import Consumer from '../models/consumer.js'
 import Incident from '../models/ChargingIncident.js'
-import { expireBooking, isAwaitingExpiry } from '../services/bookingExpiry.js'
-import { ensureWallet, transfer, paise, validateKey, walletError, bookingAmount, settleBooking, releaseBooking } from '../services/wallet.js'
+import { completeBookingPayment } from '../services/bookingCompletion.js'
+import { reportWindow } from '../services/chargeGuard.js'
+import { ensureWallet, transfer, paise, validateKey, walletError, bookingAmount, releaseBooking } from '../services/wallet.js'
 const router = express.Router()
 const wrap = fn => async (req, res) => {
   try { await fn(req, res) } catch (error) {
@@ -20,14 +21,10 @@ router.post('/bookings/:id/complete', wrap(async (req, res) => {
   const digest = value => createHash('sha256').update(value).digest()
   if (token.length < 32 || !timingSafeEqual(digest(req.get('Authorization') || ''), digest('Bearer ' + token))) walletError(403, 'Charging integration authorization required.')
   if (typeof req.body?.successful !== 'boolean') walletError(400, 'Send the charging outcome.')
-  const expired = await mongoose.connection.transaction(async session => {
+  await mongoose.connection.transaction(async session => {
     const booking = await Booking.findById(req.params.id).session(session)
     if (!booking) walletError(404, 'Booking not found.')
-    if (booking.sessionOutcome === 'expired') return true
-    if (isAwaitingExpiry(booking)) {
-      await expireBooking(booking, session)
-      return true
-    }
+    if (booking.sessionOutcome === 'expired') walletError(409, 'Booking expired before charging was verified.')
     if (booking.sessionOutcome === 'completed' || booking.sessionOutcome === 'failed') {
       if ((booking.sessionOutcome === 'completed') === req.body.successful) return
       walletError(409, 'A different charging outcome was already recorded.')
@@ -40,14 +37,9 @@ router.post('/bookings/:id/complete', wrap(async (req, res) => {
       await booking.save({ session })
       return
     }
-    await settleBooking(booking, session)
-    const payment = await Ledger.findById(booking.payment.transactionId).session(session)
-    if (!payment || payment.type !== 'PAYMENT' || String(payment.bookingId) !== booking.id || payment.amountInPaise !== booking.payment.amountInPaise) walletError(409, 'Original payment could not be verified.')
-    booking.sessionOutcome = 'completed'; booking.completedAt = new Date()
-    await booking.save({ session })
-    if (booking.payment.hostId) await transfer({ userId: booking.payment.hostId, role: 'host', amount: payment.amountInPaise, type: 'EARNING', key: `earning:${booking.id}`, bookingId: booking._id, relatedTransactionId: payment._id, description: 'completed charging earnings — no platform commission' }, session)
+    if (reportWindow(booking).end > Date.now()) walletError(409, 'The booked charging slot has not ended.')
+    await completeBookingPayment(booking, session)
   })
-  if (expired) walletError(409, 'Booking expired before charging was verified. Late outcomes require review.')
   res.json({ message: 'Charging outcome recorded.' })
 }))
 router.use((req, res, next) => {

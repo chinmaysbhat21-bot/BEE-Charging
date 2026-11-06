@@ -135,29 +135,27 @@ test('ledger mutation is blocked and state survives database reconnect', async (
   assert.equal(await balance(), 12345); assert.equal((await Ledger.findOne()).amountInPaise, 12345)
 })
 
-test('overdue bookings release reservations and reject late settlement', async () => {
-  const { expireOverdueBookings } = await import('../services/bookingExpiry.js')
+test('booked end settles the reservation and credits host earnings exactly once', async () => {
+  const { completeEndedBookings } = await import('../services/bookingCompletion.js')
   await recharge()
-  const first = await book()
-  const second = await book(1, 'expiry-late-outcome')
-  assert.equal(first.status, 201)
-  assert.equal(second.status, 201)
-  const ids = [first.body.booking._id, second.body.booking._id]
-  const now = Date.now()
-  await Booking.updateMany({ _id: { $in: ids } }, {
-    startAt: new Date(now - 7200000),
-    endAt: new Date(now - 3660000),
-  })
-  const late = await complete(ids[0])
-  assert.equal(late.status, 409)
-  assert.match(late.body.message, /expired/)
-  await expireOverdueBookings()
-  await expireOverdueBookings()
-  const bookings = await Booking.find({ _id: { $in: ids } })
-  assert.ok(bookings.every(booking => booking.sessionOutcome === 'expired' && booking.payment.status === 'RELEASED'))
-  assert.equal((await driver.get('/api/wallet')).body.wallet.reservedInPaise, 0)
+  const result = await book()
+  assert.equal(result.status, 201)
+  const id = result.body.booking._id
+  await completeEndedBookings()
+  assert.equal((await Booking.findById(id)).payment.status, 'RESERVED')
   assert.equal(await balance(), 10000)
-  assert.equal(await Ledger.countDocuments({ type: { $in: ['PAYMENT', 'EARNING'] } }), 0)
+  assert.equal(await balance('host'), 0)
+  await ended(id)
+  await completeEndedBookings()
+  await completeEndedBookings()
+  assert.equal((await complete(id)).status, 200)
+  const booking = await Booking.findById(id)
+  assert.equal(booking.sessionOutcome, 'completed')
+  assert.equal(booking.payment.status, 'PAID')
+  assert.equal((await driver.get('/api/wallet')).body.wallet.reservedInPaise, 0)
+  assert.equal(await balance(), 6000)
+  assert.equal(await balance('host'), 4000)
+  assert.equal(await Ledger.countDocuments({ type: 'EARNING' }), 1)
 })
 
 test('a reported failed paid session never earns a host credit', async () => {
