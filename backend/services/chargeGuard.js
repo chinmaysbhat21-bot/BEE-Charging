@@ -1,3 +1,5 @@
+import Ledger from '../models/WalletTransaction.js'
+import { releaseBooking, transfer } from './wallet.js'
 import mongoose from 'mongoose'
 import ChargingStation from '../models/ChargingStation.js'
 import Booking from '../models/Booking.js'
@@ -90,6 +92,17 @@ export async function reportIssue(consumerId, input) {
             consumerId: String(consumerId), hostId: station.hostId, category: input.category, description,
             reportedAt: now, reviewRequired: suspended,
         }], { session })
+        if (booking.payment?.status === 'RESERVED') {
+            await releaseBooking(booking, session)
+            booking.sessionOutcome = 'failed'
+            await booking.save({ session })
+        }
+        if (booking.payment?.transactionId) {
+            const earning = await Ledger.findOne({ bookingId: booking._id, type: 'EARNING' }).session(session)
+            if (earning) await transfer({ userId: earning.userId, role: 'host', amount: earning.amountInPaise, type: 'REVERSAL', key: 'reversal:' + booking.id, bookingId: booking._id, relatedTransactionId: earning._id, description: 'earnings reversed after charging failure report' }, session)
+            booking.sessionOutcome = 'failed'
+            await booking.save({ session })
+        }
         await station.save({ session }) // Conflicts with booking writes, serializing reservation/report races.
         await event(station, incident._id, 'REPORTED', String(consumerId), from, now, session,
             { category: input.category, priorIncident: prior?._id, suspensionReason: target.chargeGuard.suspensionReason }, target)

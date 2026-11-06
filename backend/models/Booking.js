@@ -3,6 +3,16 @@ import mongoose from 'mongoose'
 
 const bookingSchema = new mongoose.Schema(
     {
+        walletRequestKey: { type: String },
+        walletRequestFingerprint: String,
+        payment: {
+            amountInPaise: { type: Number, min: 0, validate: Number.isSafeInteger },
+            transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletTransaction' },
+            hostId: { type: mongoose.Schema.Types.ObjectId, ref: 'Consumer' },
+            status: { type: String, enum: ['RESERVED', 'PAID', 'REFUNDED', 'RELEASED'] },
+        },
+        sessionOutcome: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
+        completedAt: Date,
         chargingPointId: { type: mongoose.Schema.Types.ObjectId, default: null },
         chargingPointName: { type: String, default: '' },
         pricePerKWh: { type: Number, min: 0 },
@@ -98,6 +108,7 @@ bookingSchema.index({
 })
 
 bookingSchema.index({ station: 1, chargingPointId: 1, status: 1, startAt: 1, endAt: 1 })
+bookingSchema.index({ walletRequestKey: 1 }, { unique: true, sparse: true })
 const Booking = mongoose.model('Booking', bookingSchema)
 
 export default Booking

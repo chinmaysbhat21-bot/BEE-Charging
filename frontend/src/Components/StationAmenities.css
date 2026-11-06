@@ -1,0 +1,47 @@
+.station-amenities-picker {
+  min-width: 0;
+  padding: 12px;
+  margin: 16px 0;
+  border: 1px solid var(--ev-line);
+  border-radius: 14px;
+}
+.station-amenities-picker legend { font-weight: 700; }
+.station-amenities-picker p { margin: 0 0 10px; }
+.station-amenities-options,
+.station-amenities-display ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.station-amenities-display { margin: 10px 0; }
+.station-amenities-display ul { padding: 0; margin: 0; list-style: none; }
+.amenity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--ev-line);
+  background: var(--ev-mist);
+  color: var(--ev-ink);
+  font-size: .82rem;
+}
+.amenity-chip svg { flex: none; }
+.host-dashboard .station-amenities-picker button.amenity-chip {
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--ev-line) !important;
+  border-radius: 12px !important;
+  background: var(--ev-white) !important;
+  color: var(--ev-ink);
+}
+.host-dashboard .station-amenities-picker button[aria-pressed="true"] {
+  background: var(--ev-lime) !important;
+  border-color: var(--ev-ink) !important;
+}
+.station-amenities-picker button:focus-visible {
+  outline: 2px solid var(--ev-ink);
+  outline-offset: 2px;
+}

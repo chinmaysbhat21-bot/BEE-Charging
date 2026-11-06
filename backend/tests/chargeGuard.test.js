@@ -1,3 +1,6 @@
+import Wallet from '../models/Wallet.js'
+import Ledger from '../models/WalletTransaction.js'
+import { transfer } from '../services/wallet.js'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
@@ -36,8 +39,9 @@ before(async () => {
 after(async () => { await mongoose.disconnect(); if (mongo) await mongo.stop() })
 beforeEach(async () => {
   await mongoose.connection.db.dropDatabase()
-  await ChargingIncident.createIndexes()
+  await Promise.all([ChargingIncident.createIndexes(), Wallet.createIndexes(), Ledger.createIndexes(), Booking.createIndexes()])
   consumer = await Consumer.create({ _id: user, firstName: 'Test', lastName: 'Driver', batteries: [{ name: 'EV', vehicleMake: 'Test', vehicleModel: 'EV', capacityKwh: 40, connectorTypes: ['type2'], maxAcChargingPowerKw: 7 }] })
+  await mongoose.connection.transaction(session => transfer({ userId: user, role: 'consumer', amount: 1000000, type: 'RECHARGE', key: 'fixture-recharge:' + user, description: 'DEMO test fixture recharge' }, session))
   station = await ChargingStation.create({ name: 'Test station', stationCode: 'TEST', stationType: 'private_hosted', address: 'Test address', hostId: owner,
     location: { type: 'Point', coordinates: [77, 12] }, chargers: [{ chargerType: 'AC', chargingMode: 'AC', connectorTypes: ['type2'], powerOutputKW: 7 }], pricing: { pricingModel: 'per_kwh', pricePerKWh: 10 } })
   booking = await makeBooking()
@@ -252,6 +256,7 @@ test('five docks: assigned report, healthy reservation, repair, independent repe
   assert.equal(host.body.incidents[0].chargingPointName, 'Dock 3')
   assert.equal((await dockBook(2)).status, 409)
   const secondConsumer = await Consumer.create({ firstName: 'B', lastName: 'Driver', batteries: [consumer.batteries[0].toObject()] })
+  await mongoose.connection.transaction(session => transfer({ userId: secondConsumer.id, role: 'consumer', amount: 100000, type: 'RECHARGE', key: 'fixture-recharge:' + secondConsumer.id, description: 'DEMO test fixture recharge' }, session))
   assert.equal((await dockBook(3, secondConsumer.id, secondConsumer.batteries[0]._id)).status, 201)
   const listing = (await request(app).get('/api/charging-stations')).body.stations.find(s => s._id === station.id)
   assert.equal(listing.chargers[2].timeSlots.length, 0)

@@ -295,7 +295,7 @@ router.post('/signup/request-otp', async (req, res) => {
         ? 'OTP sent to mobile number'
         : 'OTP sent to email address',
       otpDestination: normalizedMobile ? 'mobile' : 'email',
-      otp,
+      ...(process.env.NODE_ENV === 'production' ? {} : { otp }),
       expiresAt,
     })
   } catch (error) {
@@ -587,7 +587,7 @@ router.post('/login/request-otp', async (req, res) => {
         ? 'Login OTP generated for mobile number'
         : 'Login OTP generated for email address',
       otpDestination: useMobile ? 'mobile' : 'email',
-      otp,
+      ...(process.env.NODE_ENV === 'production' ? {} : { otp }),
       expiresAt,
     })
   } catch (error) {

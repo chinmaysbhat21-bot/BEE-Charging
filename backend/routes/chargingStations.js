@@ -4,7 +4,17 @@ import ChargingStation from '../models/ChargingStation.js'
 import Booking from '../models/Booking.js'
 import { validatePoints, validateNetwork, stationViews, protectPointChanges } from '../services/chargingPoints.js'
 
+import { amenityKey } from '../../shared/amenities.js'
+
 const router = express.Router()
+
+function validateAmenities(value = []) {
+    const values = typeof value === 'string' ? value.split(',').map(item => item.trim()).filter(Boolean) : value
+    if (!Array.isArray(values) || values.length > 50 || values.some(item => !amenityKey(item))) {
+        throw Object.assign(new Error('Select only supported station amenities.'), { statusCode: 400 })
+    }
+    return [...new Set(values.map(amenityKey))]
+}
 
 // GET /api/charging-stations
 router.get('/', async (req, res) => {
@@ -251,12 +261,7 @@ router.post('/', async (req, res) => {
                 currency: 'INR',
             },
             openingHours: `${openingTime}-${closingTime}`,
-            amenities: Array.isArray(amenities)
-                ? amenities
-                : String(amenities || '')
-                    .split(',')
-                    .map((item) => item.trim())
-                    .filter(Boolean),
+            amenities: validateAmenities(amenities),
             status: 'available',
             timeSlots: [],
             isDemo: false,
@@ -317,9 +322,16 @@ router.put('/:id/points', async (req, res) => {
     if (!req.session?.consumerId) return res.status(401).json({ message: 'Please log in.' })
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid station ID.' })
     try {
+        const amenitiesOnly = req.body.chargingPoints === undefined && req.body.amenities !== undefined &&
+            req.body.chargingNetwork === undefined && req.body.otherNetworkName === undefined
         const station = await mongoose.connection.transaction(async (session) => {
             const owned = await ChargingStation.findOne({ _id: req.params.id, hostId: req.session.consumerId }).session(session)
             if (!owned) throw Object.assign(new Error('Station not found.'), { statusCode: 404 })
+            if (req.body.amenities !== undefined) owned.amenities = validateAmenities(req.body.amenities)
+            if (amenitiesOnly) {
+                await owned.save({ session })
+                return owned
+            }
             const points = validatePoints(req.body.chargingPoints, owned.chargers)
             await protectPointChanges(owned, points, session)
             owned.chargers = points
@@ -328,7 +340,7 @@ router.put('/:id/points', async (req, res) => {
             await owned.save({ session })
             return owned
         })
-        res.json({ station, message: 'Charging points saved.' })
+        res.json({ station, message: amenitiesOnly ? 'Amenities saved.' : 'Charging points saved.' })
     } catch (error) {
         res.status(error.statusCode || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.statusCode || error.name === 'ValidationError' ? error.message : 'Unable to save charging points.' })
     }

@@ -1,4 +1,8 @@
+import Wallet from '../models/Wallet.js'
+import Ledger from '../models/WalletTransaction.js'
+import { transfer } from '../services/wallet.js'
 // Isolated browser-test fixture. Never mounted by the production server.
+import walletRoutes from '../routes/wallet.js'
 import express from 'express'
 import { fileURLToPath } from 'node:url'
 import session from 'express-session'
@@ -14,18 +18,20 @@ import bookingRoutes from '../routes/bookings.js'
 import stationRoutes from '../routes/chargingStations.js'
 import guardRoutes from '../routes/chargeGuard.js'
 
-export async function startFixture() {
+export async function startFixture({ fundWallet = true } = {}) {
   const mongo = await MongoMemoryReplSet.create({ binary: { downloadDir: fileURLToPath(new URL('../node_modules/.cache/mongodb-memory-server', import.meta.url)) }, replSet: { count: 1 }, instanceOpts: [{ launchTimeout: 60000 }] })
   await mongoose.connect(mongo.getUri())
-  await Promise.all([ChargingIncident.init(), IncidentEvent.init()])
+  await Promise.all([ChargingIncident.init(), IncidentEvent.init(), Wallet.init(), Ledger.init(), Booking.init()])
   const owner = await Consumer.create({ firstName: 'Test', lastName: 'Host', email: 'host@example.test' })
   const driver = await Consumer.create({ firstName: 'Test', lastName: 'Driver', email: 'driver@example.test', batteries: [{ name: 'Test EV', vehicleMake: 'Test', vehicleModel: 'EV', capacityKwh: 40, connectorTypes: ['type2'] }] })
+  if (fundWallet) await mongoose.connection.transaction(session => transfer({ userId: driver.id, role: 'consumer', amount: 1000000, type: 'RECHARGE', key: 'fixture-recharge:' + driver.id, description: 'DEMO test fixture recharge' }, session))
   const station = await ChargingStation.create({ name: 'ChargeGuard Test Station', stationCode: 'UI-TEST', stationType: 'private_hosted', address: 'Test address', hostId: owner._id, location: { type: 'Point', coordinates: [77, 12] }, chargers: [{ chargerType: 'AC', chargingMode: 'AC', connectorTypes: ['type2'], powerOutputKW: 7 }], pricing: { pricingModel: 'per_kwh' }, isDemo: false })
   const base = { station: station._id, consumerId: driver.id, batteryId: driver.batteries[0]._id, initialCharge: 20, finalCharge: 30, date: new Date().toISOString().slice(0, 10), startTime: '10:00', endTime: '11:00', durationMinutes: 60 }
   await Booking.create({ ...base, startAt: new Date(Date.now() - 1800000), endAt: new Date(Date.now() + 1800000) })
   await Booking.create({ ...base, startAt: new Date(Date.now() - 7200000), endAt: new Date(Date.now() - 3600000) })
   const app = express(); app.use(express.json()); app.use(session({ secret: 'isolated-browser-fixture-session-secret', resave: false, saveUninitialized: false }))
-  app.use('/api/consumer/auth', authRoutes); app.use('/api/bookings', bookingRoutes); app.use('/api/charging-stations', stationRoutes); app.use('/api/chargeguard', guardRoutes)
+  app.use('/api/consumer/auth', authRoutes); app.use('/api/bookings', bookingRoutes); app.use('/api/charging-stations', stationRoutes); app.use('/api/wallet', walletRoutes)
+  app.use('/api/chargeguard', guardRoutes)
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)) })
   return { port: server.address().port, close: async () => { await new Promise((resolve) => server.close(resolve)); await mongoose.disconnect(); await mongo.stop() } }
 }

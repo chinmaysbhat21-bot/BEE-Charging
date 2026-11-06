@@ -1,3 +1,4 @@
+import { AmenitiesPicker, StationAmenities } from './Components/StationAmenities'
 import { newChargingPoint } from './data/chargingPointDefaults'
 import React, { useEffect, useState } from 'react'
 import './App.css'
@@ -13,6 +14,7 @@ import { ChargingPointEditor, StationPointManager } from './Components/ChargingP
 import { pointCompatible, pointView, pointAvailable } from '../../shared/chargingPoints'
 import { VehicleTypeSelector, BikeIllustration } from './Components/VehicleTypeSelector'
 import { BIKE_BATTERY_PROFILES } from './data/bikeBatteryProfiles'
+import { WalletPanel, BookingWallet, BookingPayment } from './Components/Wallet'
 import { BookingChargeGuard, HostChargeGuard } from './Components/ChargeGuard'
 import {
   EV_BATTERY_PROFILES,
@@ -507,6 +509,7 @@ function App() {
   const [stationsError, setStationsError] = useState('')
   const [selectedStationId, setSelectedStationId] = useState(null)
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null)
+  const [walletQuote, setWalletQuote] = useState(null)
   const [bookingModalDraft, setBookingModalDraft] = useState(null)
   const [bookingModalError, setBookingModalError] = useState('')
   const [bookingInProgress, setBookingInProgress] = useState(false)
@@ -1669,6 +1672,32 @@ function App() {
   }
 
 
+  useEffect(() => {
+    if (!loginComplete) return
+    function handleAndroidBack(event) {
+      if (menuOpen) {
+        setMenuOpen(false)
+      } else if (activeSection !== 'main') {
+        setActiveSection('main')
+        setActiveTab('profile')
+      } else if (activeTab === 'book' && bookingModalDraft) {
+        setBookingModalDraft(null)
+        setBookingModalError('')
+      } else if (activeTab === 'book' && selectedStationId) {
+        document.querySelector('button[aria-label="Back to charging station list"]')?.click()
+      } else if (activeTab === 'book' && bookSelectionView !== 'main') {
+        setBookSelectionView('main')
+      } else if (activeTab === 'book') {
+        setActiveTab('profile')
+      } else {
+        return
+      }
+      event.preventDefault()
+    }
+    window.addEventListener('bee-android-back', handleAndroidBack)
+    return () => window.removeEventListener('bee-android-back', handleAndroidBack)
+  }, [loginComplete, menuOpen, activeSection, activeTab, bookingModalDraft, selectedStationId, bookSelectionView])
+
   if (loginComplete) {
     return (
       <div className={`consumer-shell${activeTab === 'profile' ? ' profile-shell' : ' book-shell'}`}>
@@ -1809,6 +1838,7 @@ function App() {
                           <div className="my-order-details">
                             <h3>{booking.station?.name || 'Charging Station'}</h3>
                             {booking.chargingPointName && <p>Charging point: {booking.chargingPointName}{booking.pricePerKWh != null ? ` · ₹${booking.pricePerKWh}/kWh` : ''}</p>}
+                            <BookingPayment booking={booking} />
                             <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
 
                             <p>
@@ -2069,7 +2099,8 @@ function App() {
                               <h3>
                                 {booking.station?.name || 'Charging Station'}
                               </h3>
-                              <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
+                              <BookingPayment booking={booking} />
+                            <BookingChargeGuard booking={booking} onReported={() => window.dispatchEvent(new Event('chargeguard-report'))} />
 
                               <p>
                                 {formatDate(booking.date)}
@@ -2142,6 +2173,7 @@ function App() {
                 <h2>Host Dashboard</h2>
                 <p>Make your charger available to local EV drivers and manage your station details here.</p>
                 <HostChargeGuard />
+                <WalletPanel role="host" />
 
                 <button
                   type="button"
@@ -2243,18 +2275,7 @@ function App() {
                             {station.pointBookingEnabled ? 'Per-point tariffs — see charging points above.' : describeStationPricing(station.pricing)}
                           </p>
 
-                          <p>
-                            <strong>Amenities:</strong>{' '}
-                            {Array.isArray(station.amenities) && station.amenities.length > 0
-                              ? station.amenities
-                                .map((amenity) =>
-                                  typeof amenity === 'string'
-                                    ? amenity
-                                    : amenity.name || amenity.label || 'Amenity'
-                                )
-                                .join(', ')
-                              : 'Not provided'}
-                          </p>
+                          <StationAmenities value={station.amenities} heading />
                         </div>
 
                         <div className="host-station-card-actions">
@@ -2542,23 +2563,8 @@ function App() {
                         />
                       </label>
 
-                      <label>
-                        Amenities (comma-separated)
-                        <input
-                          type="text"
-                          value={hostStationForm.amenities.join(', ')}
-                          placeholder="Parking, CCTV, Restroom"
-                          onChange={(event) =>
-                            setHostStationForm({
-                              ...hostStationForm,
-                              amenities: event.target.value
-                                .split(',')
-                                .map((item) => item.trim())
-                                .filter(Boolean)
-                            })
-                          }
-                        />
-                      </label>
+                      <AmenitiesPicker value={hostStationForm.amenities}
+                        onChange={amenities => setHostStationForm(form => ({ ...form, amenities }))} />
 
                       <div className="host-station-form-actions">
                         <button type="submit" disabled={hostStationSaving}>{hostStationSaving ? 'Saving station…' : 'Save charging station'}</button>
@@ -2671,6 +2677,7 @@ function App() {
               </div>
 
               <div className="profile-list-section">
+                <WalletPanel />
                 <h3>Saved Addresses</h3>
 
                 {savedAddresses.length === 0 ? (
@@ -3340,6 +3347,7 @@ function App() {
                               <a className="station-details-map-button" href={mapUrl} target="_blank" rel="noreferrer">🗺️ Map / Get directions</a>
                             </div>
 
+                            <StationAmenities value={station.amenities} heading />
                             <div className="station-details-slot-section">
                               <div className="station-details-slot-heading">
                                 <div className="station-details-slot-description"><p>Showing continuous availability for at least {formatDuration(estimate.durationMinutes)} on the selected date.</p></div>
@@ -3428,11 +3436,12 @@ function App() {
                               )}
                             </div>
 
+                            <BookingWallet request={{ stationId: String(station._id), chargingPointId: selectedPoint?._id, batteryId: selectedBookingBattery?.id, initialCharge: Number(initialCharge), finalCharge: Number(finalCharge), durationMinutes: selectedTimeSlot ? (Number(selectedTimeSlot.endTime.slice(0, 2)) * 60 + Number(selectedTimeSlot.endTime.slice(3))) - (Number(selectedTimeSlot.startTime.slice(0, 2)) * 60 + Number(selectedTimeSlot.startTime.slice(3))) : estimate.durationMinutes }} onQuote={setWalletQuote} />
                             <div className="station-details-actions">
                               <button
                                 type="button"
                                 className="station-details-book-button"
-                                disabled={!selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode) || (station.pointBookingEnabled && String(selectedTimeSlot.chargingPointId) !== String(selectedPoint?._id)) || bookingInProgress}
+                                disabled={!walletQuote?.sufficient || !selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode) || (station.pointBookingEnabled && String(selectedTimeSlot.chargingPointId) !== String(selectedPoint?._id)) || bookingInProgress}
                                 onClick={async () => {
                                   if (!selectedTimeSlot || selectedTimeSlot.stationId !== String(station._id || station.stationCode) || (station.pointBookingEnabled && String(selectedTimeSlot.chargingPointId) !== String(selectedPoint?._id))) return
                                   setBookingInProgress(true)
@@ -3440,8 +3449,9 @@ function App() {
                                     const response = await fetch('/api/bookings', {
                                       method: 'POST',
                                       credentials: 'include',
-                                      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                                      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': walletQuote.key },
                                       body: JSON.stringify({
+                                        expectedAmountInPaise: walletQuote.amountInPaise,
                                         stationId: String(station._id),
                                         ...(station.pointBookingEnabled ? { chargingPointId: estimate.charger._id } : {}),
                                         date: selectedTimeSlot.date,
@@ -3472,6 +3482,8 @@ function App() {
                                         Array.isArray(bookingsData.bookings) ? bookingsData.bookings : []
                                       )
                                     }
+                                    sessionStorage.removeItem('bee-booking-payment')
+                                    window.dispatchEvent(new Event('wallet-updated'))
                                     setSelectedTimeSlot(null)
                                     window.alert(data.message || 'Charging slot booked successfully.')
                                   } catch (error) {
@@ -3569,6 +3581,7 @@ function App() {
                               <div className="charging-station-card-description">
                                 <h3>{station.name}</h3><p>{station.chargingNetwork === 'Other' ? station.otherNetworkName : station.chargingNetwork || 'Independent / unspecified'}{station.pointBookingEnabled ? ` · ${station.chargers.length} charging points` : ''}</p>
                                 <p className="charging-station-card-address">{station.address}</p>
+                                <StationAmenities value={station.amenities} limit={3} />
                                 <div className="charging-station-card-facts">
                                   <span>📍 {roadDistancesKm[String(station._id || station.stationCode || '')] == null ? 'Road distance unavailable' : `${selectedBookingAddress?.coordinatesApproximate ? '≈ ' : ''}${roadDistancesKm[String(station._id || station.stationCode || '')].toFixed(1)} km driving`}</span>
                                   <span>🔌 {(estimate.charger.connectorTypes || []).join(', ') || 'Connector not specified'}</span>

@@ -12,13 +12,17 @@
     "test:chargeguard-ui": "node tests/chargeguard-ui.mjs",
     "test:ev-profiles": "node tests/ev-battery-profiles.mjs",
     "test:vehicle-types": "node tests/vehicle-types.mjs",
-    "test:charging-points-ui": "node tests/charging-points-ui.mjs"
+    "test:charging-points-ui": "node tests/charging-points-ui.mjs",
+    "test:wallet-ui": "node tests/wallet-ui.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
     "@playwright/test": "^1.64.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",

@@ -1,3 +1,4 @@
+import { AmenitiesPicker } from './StationAmenities'
 import { useId, useState } from 'react'
 import { NetworkProviderIcon } from './NetworkProviderIcon'
 import { VehicleTypeSelector } from './VehicleTypeSelector'
@@ -41,6 +42,7 @@ export function ChargingPointEditor({ value, onChange }) {
 
 export function StationPointManager({ station, onSaved }) {
   const [draft, setDraft] = useState(null)
+  const [pointEdits, setPointEdits] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const points = station.chargers || []
@@ -51,14 +53,14 @@ export function StationPointManager({ station, onSaved }) {
     <p>{points.length} charging points · {points.filter((p) => (p.vehicleType || 'car') === 'car').length} car · {points.filter((p) => p.vehicleType === 'bike').length} bike</p>
     <p>{station.pointBookingEnabled ? `${blocked ? 0 : points.filter((p) => pointAvailable(p) && !p.occupied).length} available now · ${points.filter((p) => p.occupied).length} occupied now` : 'Legacy station-level availability; configure points to enable independent bookings.'}</p>
     <details><summary>View charging points</summary>{points.map((p, i) => <p key={p._id}>{p.name || `Charging Point ${i + 1}`} · {p.vehicleType || 'car'} · {p.powerOutputKW} kW {p.chargingMode} · {p.connectorTypes.join(', ')} · ₹{p.pricePerKWh ?? station.pricing?.pricePerKWh}/kWh · {p.occupied ? 'Occupied' : p.availability || 'available'} · <HealthBadge state={p.chargeGuard?.state} /></p>)}</details>
-    {!draft ? <button type="button" className="button button-secondary" onClick={() => { setMessage(''); setDraft({ chargingNetwork: station.chargingNetwork || '', otherNetworkName: station.otherNetworkName || '', chargingPoints: points.map((p, i) => ({ ...p, name: p.name || `Charging Point ${i + 1}`, pricePerKWh: p.pricePerKWh ?? station.pricing?.pricePerKWh ?? 0 })) }) }}>Manage charging points</button> : <form onSubmit={async (e) => {
+    {!draft ? <button type="button" className="button button-secondary" onClick={() => { setMessage(''); setPointEdits(false); setDraft({ chargingNetwork: station.chargingNetwork || '', otherNetworkName: station.otherNetworkName || '', chargingPoints: points.map((p, i) => ({ ...p, name: p.name || `Charging Point ${i + 1}`, pricePerKWh: p.pricePerKWh ?? station.pricing?.pricePerKWh ?? 0 })) }) }}>Manage charging points</button> : <form onSubmit={async (e) => {
       e.preventDefault(); if (busy) return; setBusy(true); setMessage('')
       try {
-        const response = await fetch(`/api/charging-stations/${station._id}/points`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) })
+        const response = await fetch(`/api/charging-stations/${station._id}/points`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(!pointEdits && draft.amenities !== undefined ? { amenities: draft.amenities } : draft) })
         const data = await response.json(); if (!response.ok) throw new Error(data.message)
-        setDraft(null); setMessage('Charging points saved.'); await onSaved(true)
+        setDraft(null); setMessage(data.message); await onSaved(true)
       } catch (error) { setMessage(error.message || 'Unable to save charging points.') } finally { setBusy(false) }
-    }}><fieldset disabled={busy}><ChargingPointEditor value={draft} onChange={setDraft} /><button className="button button-primary">{busy ? 'Saving…' : 'Save charging points'}</button><button type="button" className="button button-secondary" onClick={() => setDraft(null)}>Cancel</button></fieldset></form>}
+    }}><fieldset disabled={busy}><ChargingPointEditor value={draft} onChange={value => { setPointEdits(true); setDraft(value) }} /><AmenitiesPicker value={draft.amenities ?? station.amenities} onChange={amenities => setDraft(value => ({ ...value, amenities }))} /><button className="button button-primary">{busy ? 'Saving…' : 'Save charging points'}</button><button type="button" className="button button-secondary" onClick={() => setDraft(null)}>Cancel</button></fieldset></form>}
     {message && <p role="status">{message}</p>}
   </section>
 }

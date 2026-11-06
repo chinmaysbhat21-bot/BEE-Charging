@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BEE Charging</string>
+    <string name="title_activity_main">BEE Charging</string>
+    <string name="package_name">com.beecharging.app</string>
+    <string name="custom_url_scheme">com.beecharging.app</string>
+</resources>

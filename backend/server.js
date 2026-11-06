@@ -1,10 +1,12 @@
 
+import walletRoutes from './routes/wallet.js'
 import express from 'express'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
 import cors from 'cors'
 import session from 'express-session'
 import MongoStore from 'connect-mongo'
+import { fileURLToPath } from 'node:url'
 
 import consumerAuthRoutes from './routes/consumerAuth.js'
 import chargingStationsRoutes from './routes/chargingStations.js'
@@ -14,6 +16,9 @@ import chargeGuardRoutes from './routes/chargeGuard.js'
 dotenv.config()
 
 const app = express()
+const hosted = process.env.RENDER === 'true'
+
+if (hosted) app.set('trust proxy', 1)
 
 app.use(
   cors({
@@ -34,7 +39,7 @@ app.use(
     }),
     cookie: {
       httpOnly: true,
-      secure: false,
+      secure: hosted,
       maxAge: 24 * 60 * 60 * 1000,
     },
   })
@@ -45,7 +50,8 @@ const PORT = process.env.PORT || 5001
 app.use('/api/consumer/auth', consumerAuthRoutes)
 app.use('/api/charging-stations', chargingStationsRoutes)
 app.use('/api/bookings', bookingsRoutes)
-app.use('/api/chargeguard', chargeGuardRoutes)
+app.use('/api/wallet', walletRoutes)
+  app.use('/api/chargeguard', chargeGuardRoutes)
 
 mongoose
   .connect(process.env.MONGODB_URI)
@@ -55,6 +61,8 @@ mongoose
   .catch((error) => {
     console.error('MongoDB connection failed:', error.message)
   })
+
+if (hosted) app.use(express.static(fileURLToPath(new URL('../frontend/dist/', import.meta.url))))
 
 app.get('/', (req, res) => {
   res.send('Consumer backend is running')

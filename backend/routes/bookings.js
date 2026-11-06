@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { reserveBooking, refundBooking, validateKey } from '../services/wallet.js'
 import express from 'express'
 import mongoose from 'mongoose'
 import Booking from '../models/Booking.js'
@@ -330,10 +332,20 @@ router.post('/', async (req, res) => {
 
             session = await mongoose.startSession()
 
+            const requestKey = req.get('Idempotency-Key') ? consumerId + ':' + validateKey(req.get('Idempotency-Key')) : undefined
+            const fingerprint = createHash('sha256').update(JSON.stringify([stationId, req.body.chargingPointId || null, batteryId, date, startTime, endTime, initialCharge, finalCharge])).digest('hex')
             let createdBooking
             let requiredMinutes
 
             await session.withTransaction(async () => {
+                if (requestKey) {
+                    const existing = await Booking.findOne({ walletRequestKey: requestKey }).session(session)
+                    if (existing) {
+                        if (existing.walletRequestFingerprint !== fingerprint) reject('Idempotency key was used for another booking.', 409)
+                        createdBooking = existing
+                        return
+                    }
+                }
                 // Always read the latest documents inside the transaction.
 
                 const station = await ChargingStation.findById(stationId).session(session)
@@ -488,6 +500,8 @@ router.post('/', async (req, res) => {
 
                 const [booking] = await Booking.create(
                     [{
+                        walletRequestKey: requestKey,
+                        walletRequestFingerprint: requestKey ? fingerprint : undefined,
                         station: station._id,
                         chargingPointId: point?._id || null,
                         chargingPointName: point?.name || "",
@@ -507,6 +521,8 @@ router.post('/', async (req, res) => {
                     { session }
                 )
 
+                await reserveBooking(booking, station, point, battery, session)
+                if (req.body.expectedAmountInPaise != null && req.body.expectedAmountInPaise !== booking.payment.amountInPaise) reject('Price changed. Review the booking amount and confirm again.', 409)
                 if (!point) {
                 const updatedSlots = []
 
@@ -583,7 +599,7 @@ router.post('/', async (req, res) => {
             })
 
             return res.status(201).json({
-                message: 'Charging station booked successfully.',
+                message: 'Charging station booked successfully. Wallet funds reserved until charging completes.',
                 booking: createdBooking,
                 requiredMinutes,
             })
@@ -660,6 +676,7 @@ router.delete('/:bookingId', async (req, res) => {
                 return
             }
 
+            if (booking.sessionOutcome === 'completed') { responseStatus = 400; responseBody = { message: 'Completed sessions cannot be cancelled.' }; return }
             const cancellationDeadline =
                 new Date(booking.startAt).getTime() -
                 60 * 60 * 1000
@@ -758,6 +775,7 @@ router.delete('/:bookingId', async (req, res) => {
 
             // Update just the status; do not validate unrelated
             // required fields such as initialCharge/finalCharge.
+            await refundBooking(booking, session)
             const updateResult = await Booking.updateOne(
                 {
                     _id: booking._id,

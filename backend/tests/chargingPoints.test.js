@@ -116,3 +116,21 @@ test('15-station import is repeatable, preserves coordinates and unrelated recor
   assert.deepEqual((await ChargingStation.findById(station._id)).toObject(), userBefore)
   await assert.rejects(importDemoStations(rows.map((r, i) => i ? r : { ...r, coordinates: [74, 12] }), mongoose.connection), /Coordinates differ/)
 })
+
+test('amenities-only edits validate, normalize and preserve legacy station settings', async () => {
+  const legacy = await ChargingStation.findOne({ stationCode: 'UI-TEST' }).lean()
+  const url = '/api/charging-stations/' + legacy._id + '/points'
+  assert.equal((await driver.put(url).send({ amenities: ['parking'] })).status, 404)
+  assert.equal((await host.put(url).send({ amenities: ['invented'] })).status, 400)
+  const saved = await host.put(url).send({ amenities: [' Parking ', 'Restroom', 'parking', 'Wi-Fi'] })
+  assert.equal(saved.status, 200)
+  assert.deepEqual(saved.body.station.amenities, ['parking', 'washroom', 'wifi'])
+  const current = await ChargingStation.findById(legacy._id).lean()
+  assert.equal(current.pointBookingEnabled, legacy.pointBookingEnabled)
+  assert.deepEqual(current.chargers, legacy.chargers)
+  assert.deepEqual(current.pricing, legacy.pricing)
+  assert.deepEqual(current.timeSlots, legacy.timeSlots)
+  const cleared = await host.put(url).send({ amenities: [] })
+  assert.equal(cleared.status, 200)
+  assert.deepEqual(cleared.body.station.amenities, [])
+})
