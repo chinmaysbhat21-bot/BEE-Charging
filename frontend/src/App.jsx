@@ -555,6 +555,35 @@ function App() {
   }
 
 
+  const useHostCurrentLocation = () => {
+    setHostStationMessage('')
+    if (!navigator.geolocation) {
+      setHostStationError('Location is unavailable here. Find coordinates from your address or enter them manually.')
+      return
+    }
+
+    setHostStationError('')
+    setHostCoordinatesLoading('device')
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setHostStationForm(current => ({
+          ...current,
+          latitude: String(coords.latitude),
+          longitude: String(coords.longitude),
+        }))
+        setHostStationMessage('Current coordinates added. Check that they match your charger location before saving.')
+        setHostCoordinatesLoading(false)
+      },
+      (error) => {
+        setHostStationError(error.code === 1
+          ? 'Location permission was denied. Allow location in your app or browser settings, or enter coordinates manually.'
+          : 'Could not get your current location. Check that location is turned on, then retry or enter coordinates manually.')
+        setHostCoordinatesLoading(false)
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    )
+  }
+
   const resolveHostCoordinates = async () => {
     const address = hostStationForm.address?.trim()
     const area = hostStationForm.area?.trim()
@@ -567,7 +596,7 @@ function App() {
       return
     }
 
-    setHostCoordinatesLoading(true)
+    setHostCoordinatesLoading('address')
     setHostStationError('')
     setHostStationMessage('')
 
@@ -2425,7 +2454,10 @@ function App() {
                           onClick={resolveHostCoordinates}
                           disabled={hostCoordinatesLoading}
                         >
-                          {hostCoordinatesLoading ? 'Finding Coordinates...' : 'Find Coordinates'}
+                          {hostCoordinatesLoading === 'address' ? 'Finding Coordinates...' : 'Find Coordinates'}
+                        </button>
+                        <button type="button" onClick={useHostCurrentLocation} disabled={Boolean(hostCoordinatesLoading)}>
+                          {hostCoordinatesLoading === 'device' ? 'Getting Current Location...' : 'Use Current Location'}
                         </button>
 
                         {hostStationForm.latitude && hostStationForm.longitude && (
