@@ -204,7 +204,7 @@ router.get('/my', async (req, res) => {
 
         const [bookings, consumer] = await Promise.all([
             Booking.find({ consumerId })
-                .populate('station', 'name address stationCode chargeGuard')
+                .populate('station', 'name address stationCode chargeGuard chargers')
                 .sort({ startAt: 1 }),
 
             Consumer.findOne({ _id: consumerId }).select('batteries'),
@@ -220,6 +220,8 @@ router.get('/my', async (req, res) => {
 
             return {
                 ...bookingData,
+                dockHealth: booking.chargingPointId && booking.station?.chargers.id(booking.chargingPointId) ? healthState(booking.station.chargers.id(booking.chargingPointId)) : null,
+                dockConnectorTypes: booking.station?.chargers.id(booking.chargingPointId)?.connectorTypes || [],
                 chargeGuardReportEligible: eligibleBooking(booking, consumerId),
                 stationHealth: booking.station ? healthState(booking.station) : null,
                 initialCharge: booking.initialCharge,
@@ -378,6 +380,7 @@ router.post('/', async (req, res) => {
                     if (!mongoose.isValidObjectId(req.body.chargingPointId)) reject('Select a charging point.')
                     point = station.chargers.id(req.body.chargingPointId)
                     if (!point) reject('Charging point not found at this station.', 404)
+                    assertBookable(point)
                     if (point.availability !== 'available') reject('This charging point is unavailable.', 409)
                     if (!pointCompatible(point, battery)) reject('This charging point is not compatible with your vehicle.')
                 } else if ((battery.vehicleType || 'car') !== 'car') reject('This legacy station has not confirmed bike compatibility.')

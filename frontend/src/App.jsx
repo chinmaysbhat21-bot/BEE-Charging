@@ -10,7 +10,7 @@ import './product-polish.css'
 import Signup from './Components/Signup'
 import Login from './Components/Login'
 import { ChargingPointEditor, StationPointManager } from './Components/ChargingPointEditor'
-import { pointCompatible, pointView } from '../../shared/chargingPoints'
+import { pointCompatible, pointView, pointAvailable } from '../../shared/chargingPoints'
 import { VehicleTypeSelector, BikeIllustration } from './Components/VehicleTypeSelector'
 import { BIKE_BATTERY_PROFILES } from './data/bikeBatteryProfiles'
 import { BookingChargeGuard, HostChargeGuard } from './Components/ChargeGuard'
@@ -113,7 +113,7 @@ function stationIsAvailable(station) {
 }
 
 function getCompatibleCharger(station, battery) {
-  if (station.pointBookingEnabled) return (station.chargers || []).find((point) => point.availability === 'available' && pointCompatible(point, battery)) || null
+  if (station.pointBookingEnabled) return (station.chargers || []).find((point) => pointAvailable(point) && pointCompatible(point, battery)) || null
   if ((battery?.vehicleType || 'car') !== 'car') return null
   const vehicleConnectors = (battery?.connectorTypes?.length ? battery.connectorTypes : battery?.connectorType ? [battery.connectorType] : []).map((connector) => connector.trim().toLowerCase())
   if (!vehicleConnectors.length) return null
@@ -3263,7 +3263,7 @@ function App() {
                         if (selectedStation) {
                           const parentStation = selectedStation.station
                           const compatiblePoints = parentStation.pointBookingEnabled ? parentStation.chargers.filter((p) => pointCompatible(p, selectedBookingBattery)) : []
-                          const selectedPoint = compatiblePoints.find((p) => String(p._id) === selectedChargingPointId && p.availability === 'available') || compatiblePoints.find((p) => p.availability === 'available')
+                          const selectedPoint = compatiblePoints.find((p) => String(p._id) === selectedChargingPointId && pointAvailable(p)) || compatiblePoints.find((p) => pointAvailable(p))
                           const station = selectedPoint ? pointView(parentStation, selectedPoint) : parentStation
                           const estimate = selectedPoint ? getStationEstimate(station, selectedBookingBattery, initialCharge, finalCharge, selectedBookingAddress) : selectedStation.estimate
                           const stationPrice = station.pricing?.pricingModel === 'per_kwh' ? `₹${station.pricing?.pricePerKWh ?? 0}/kWh` : station.pricing?.pricingModel === 'per_minute' ? `₹${station.pricing?.pricePerMinute ?? 0}/minute` : station.pricing?.pricingModel === 'per_session' ? `₹${station.pricing?.sessionFee ?? 0}/session` : 'Variable tariff'
@@ -3290,7 +3290,7 @@ function App() {
                                   <p>Network: {station.chargingNetwork === 'Other' ? station.otherNetworkName : station.chargingNetwork || 'Independent / unspecified'}</p>
                                   {station.pointBookingEnabled && <label className="point-selector">Choose a compatible charging point
                                     <select value={String(selectedPoint?._id || '')} onChange={(event) => { setSelectedChargingPointId(event.target.value); setSelectedTimeSlot(null); setBookingModalDraft(null) }}>
-                                      {compatiblePoints.map((point) => <option key={point._id} value={String(point._id)} disabled={point.availability !== 'available'}>{point.name} · {point.vehicleType} · {point.powerOutputKW} kW {point.chargingMode} · {point.connectorTypes.join(', ')} · ₹{point.pricePerKWh}/kWh · {point.availability !== 'available' ? point.availability : point.occupied ? 'Occupied now; choose a future slot' : 'Available'}</option>)}
+                                      {compatiblePoints.map((point) => <option key={point._id} value={String(point._id)} disabled={!pointAvailable(point)}>{point.name} · {point.vehicleType} · {point.powerOutputKW} kW {point.chargingMode} · {point.connectorTypes.join(', ')} · ₹{point.pricePerKWh}/kWh · {!pointAvailable(point) ? (['PAUSED', 'SUSPENDED'].includes(point.chargeGuard?.state) ? point.chargeGuard.state : point.availability) : point.occupied ? 'Occupied now; choose a future slot' : 'Available'}</option>)}
                                     </select>
                                     <small>Filtered for your saved {selectedBookingBattery?.vehicleType === 'bike' ? 'electric bike' : 'electric car'}. Each point has separate time slots.</small>
                                   </label>}

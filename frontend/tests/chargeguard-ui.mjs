@@ -1,12 +1,23 @@
 import { chromium, expect } from '@playwright/test'
 import { createServer } from 'vite'
 import { mkdir } from 'node:fs/promises'
+import ChargingStation from '../../backend/models/ChargingStation.js'
+import Booking from '../../backend/models/Booking.js'
 import { startFixture } from '../../backend/tests/uiFixture.js'
 
 let fixture, vite, browser
 const errors = []
 try {
   fixture = await startFixture()
+  const dockMode = process.argv.includes('--docks')
+  if (dockMode) {
+    const station = await ChargingStation.findOne({ stationCode: 'UI-TEST' })
+    const base = station.chargers[0].toObject(); delete base._id
+    station.pointBookingEnabled = true
+    station.chargers = Array.from({ length: 5 }, (_, i) => ({ ...base, name: 'Dock ' + (i + 1) }))
+    await station.save()
+    await Booking.updateMany({ station: station._id }, { $set: { chargingPointId: station.chargers[2]._id, chargingPointName: 'Dock 3' } })
+  }
   vite = await createServer({ server: { host: '127.0.0.1', port: 0, proxy: { '/api': { target: `http://127.0.0.1:${fixture.port}`, changeOrigin: true } } } })
   await vite.listen()
   const baseURL = `http://127.0.0.1:${vite.httpServer.address().port}`
@@ -36,6 +47,7 @@ try {
   await menu('My Orders')
   await page.getByRole('button', { name: 'Report Charging Issue' }).click()
   await expect(page.getByLabel('Issue type')).toBeFocused()
+  if (dockMode) await expect(page.locator('.cg-form').getByText(/Dock 3/)).toBeVisible()
   await page.getByLabel('Issue type').selectOption('charger_malfunction')
   await page.getByLabel('Explanation').fill('Charging did not start when connected.')
   await noOverflow()
@@ -45,6 +57,9 @@ try {
   await page.screenshot({ path: 'test-results/chargeguard/consumer-mobile.png', fullPage: true })
   await page.getByRole('button', { name: 'Submit report', exact: true }).click()
   await expect(page.getByText('Your reservation may be at risk.')).toBeVisible()
+  await page.reload()
+  await menu('My Orders')
+  await expect(page.getByText('Your reservation may be at risk.')).toBeVisible()
   await menu('History')
   await page.getByRole('button', { name: 'Report Charging Issue' }).click()
   await expect(page.getByLabel('Issue type')).toBeVisible()
@@ -52,7 +67,7 @@ try {
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await login('host@example.test')
   await menu('Host')
-  await expect(page.getByText('PAUSED', { exact: true })).toBeVisible()
+  await expect(page.locator('.cg-panel').getByText('PAUSED', { exact: true })).toBeVisible()
   await page.getByText('Open incident', { exact: true }).click()
   await page.getByLabel('What was the problem?').fill('Damaged connector.')
   await page.getByLabel('What did you fix?').fill('Replaced connector and completed a charging test.')
@@ -65,8 +80,15 @@ try {
   await noOverflow()
   await page.screenshot({ path: 'test-results/chargeguard/host-desktop.png', fullPage: true })
   await page.getByRole('button', { name: 'Submit repair declaration' }).click()
-  await expect(page.getByText('PROBATION', { exact: true })).toBeVisible()
+  await expect(page.locator('.cg-panel').getByText('PROBATION', { exact: true })).toBeVisible()
   await expect(page.getByText('View repair declaration', { exact: true })).toBeVisible()
+  await page.reload()
+  await menu('Host')
+  await expect(page.locator('.cg-panel').getByText('PROBATION', { exact: true })).toBeVisible()
+  if (dockMode) {
+    const saved = await ChargingStation.findOne({ stationCode: 'UI-TEST' })
+    expect(saved.chargers.map(p => p.chargeGuard.state)).toEqual(['ACTIVE', 'ACTIVE', 'PROBATION', 'ACTIVE', 'ACTIVE'])
+  }
   expect(errors).toEqual([])
   console.log('PASS browser: real session login, report, risk warning, history form, host repair, probation, desktop/mobile overflow and focus; no page errors.')
 } finally {

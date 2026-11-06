@@ -25,3 +25,7 @@ export function pointView(station, point) {
   return { ...station, chargers: [point], timeSlots: point.timeSlots || station.timeSlots,
     pricing: point.pricePerKWh == null ? station.pricing : { pricingModel: 'per_kwh', pricePerKWh: point.pricePerKWh, currency: station.pricing?.currency || 'INR' } }
 }
+
+export function pointAvailable(point) {
+  return point.availability === 'available' && !['PAUSED', 'SUSPENDED'].includes(point.chargeGuard?.state)
+}

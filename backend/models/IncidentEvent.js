@@ -1,6 +1,9 @@
 import mongoose from 'mongoose'
 
 const schema = new mongoose.Schema({
+    chargingPointId: { type: mongoose.Schema.Types.ObjectId, default: null, immutable: true },
+    chargingPointName: { type: String, default: '', immutable: true },
+    connectorTypes: { type: [String], default: [], immutable: true },
     station: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
     incident: { type: mongoose.Schema.Types.ObjectId, default: null },
     type: { type: String, enum: ['REPORTED', 'REPAIR_DECLARED', 'PROBATION_EXPIRED', 'ADMIN_REACTIVATED'], required: true },
@@ -15,4 +18,5 @@ schema.pre('save', function () { if (!this.isNew) throw new Error('Incident even
 for (const operation of ['updateOne', 'updateMany', 'findOneAndUpdate', 'replaceOne', 'findOneAndReplace', 'deleteOne', 'deleteMany', 'findOneAndDelete']) {
     schema.pre(operation, function () { throw new Error('Incident events are append-only.') })
 }
+schema.index({ station: 1, chargingPointId: 1, at: 1 })
 export default mongoose.model('IncidentEvent', schema)

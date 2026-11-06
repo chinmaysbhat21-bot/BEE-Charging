@@ -3,6 +3,17 @@ import mongoose from 'mongoose'
 
 const chargerSchema = new mongoose.Schema(
     {
+        chargeGuard: {
+            type: new mongoose.Schema({
+                state: { type: String, enum: ['ACTIVE', 'PAUSED', 'PROBATION', 'SUSPENDED'], default: 'ACTIVE' },
+                repairAt: Date,
+                probationUntil: Date,
+                reviewedAt: Date,
+                suspensionCount: { type: Number, default: 0 },
+                suspensionReason: { type: String, default: '' },
+            }, { _id: false }),
+            default: () => ({}),
+        },
         name: { type: String, trim: true, maxlength: 100, default: '' },
         vehicleType: { type: String, enum: ['car', 'bike'], default: 'car' },
         availability: { type: String, enum: ['available', 'offline', 'maintenance'], default: 'available' },

@@ -1,7 +1,8 @@
 import { useId, useState } from 'react'
 import { NetworkProviderIcon } from './NetworkProviderIcon'
 import { VehicleTypeSelector } from './VehicleTypeSelector'
-import { CHARGING_NETWORKS } from '../../../shared/chargingPoints'
+import { HealthBadge } from './ChargeGuard'
+import { CHARGING_NETWORKS, pointAvailable } from '../../../shared/chargingPoints'
 import './ChargingPointEditor.css'
 
 import { newChargingPoint } from '../data/chargingPointDefaults'
@@ -48,8 +49,8 @@ export function StationPointManager({ station, onSaved }) {
     <button type="button" className="button button-secondary" disabled={busy} onClick={() => onSaved(true)}>Refresh availability</button>
     <p><strong>Network:</strong> {station.chargingNetwork === 'Other' ? station.otherNetworkName : station.chargingNetwork || 'Independent / unspecified'}</p>
     <p>{points.length} charging points · {points.filter((p) => (p.vehicleType || 'car') === 'car').length} car · {points.filter((p) => p.vehicleType === 'bike').length} bike</p>
-    <p>{station.pointBookingEnabled ? `${blocked ? 0 : points.filter((p) => p.availability === 'available' && !p.occupied).length} available now · ${points.filter((p) => p.occupied).length} occupied now` : 'Legacy station-level availability; configure points to enable independent bookings.'}</p>
-    <details><summary>View charging points</summary>{points.map((p, i) => <p key={p._id}>{p.name || `Charging Point ${i + 1}`} · {p.vehicleType || 'car'} · {p.powerOutputKW} kW {p.chargingMode} · {p.connectorTypes.join(', ')} · ₹{p.pricePerKWh ?? station.pricing?.pricePerKWh}/kWh · {p.occupied ? 'Occupied' : p.availability || 'available'}</p>)}</details>
+    <p>{station.pointBookingEnabled ? `${blocked ? 0 : points.filter((p) => pointAvailable(p) && !p.occupied).length} available now · ${points.filter((p) => p.occupied).length} occupied now` : 'Legacy station-level availability; configure points to enable independent bookings.'}</p>
+    <details><summary>View charging points</summary>{points.map((p, i) => <p key={p._id}>{p.name || `Charging Point ${i + 1}`} · {p.vehicleType || 'car'} · {p.powerOutputKW} kW {p.chargingMode} · {p.connectorTypes.join(', ')} · ₹{p.pricePerKWh ?? station.pricing?.pricePerKWh}/kWh · {p.occupied ? 'Occupied' : p.availability || 'available'} · <HealthBadge state={p.chargeGuard?.state} /></p>)}</details>
     {!draft ? <button type="button" className="button button-secondary" onClick={() => { setMessage(''); setDraft({ chargingNetwork: station.chargingNetwork || '', otherNetworkName: station.otherNetworkName || '', chargingPoints: points.map((p, i) => ({ ...p, name: p.name || `Charging Point ${i + 1}`, pricePerKWh: p.pricePerKWh ?? station.pricing?.pricePerKWh ?? 0 })) }) }}>Manage charging points</button> : <form onSubmit={async (e) => {
       e.preventDefault(); if (busy) return; setBusy(true); setMessage('')
       try {

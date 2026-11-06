@@ -33,30 +33,30 @@ router.use((req, res, next) => {
 })
 router.post('/reports', consumer, wrap(async (req, res) => {
     const incident = await reportIssue(req.session.consumerId, req.body || {})
-    res.status(201).json({ incident, message: 'Issue recorded. Reservations are paused and the host can review your report.' })
+    res.status(201).json({ incident, message: incident.chargingPointId ? `Issue recorded for ${incident.chargingPointName || 'your dock'}. Only this dock is paused; the host can review your report.` : 'Issue recorded. Reservations are paused and the host can review your report.' })
 }))
 router.get('/host/incidents', consumer, wrap(async (req, res) => {
     const owned = await ChargingStation.find({ hostId: req.session.consumerId }).select('_id')
     // Persist expiry lazily on host reads, without relying on a running background timer.
-    const expired = await ChargingStation.find({ _id: { $in: owned.map((s) => s._id) }, 'chargeGuard.state': 'PROBATION', 'chargeGuard.probationUntil': { $lte: new Date() } }).select('_id')
+    const expired = await ChargingStation.find({ _id: { $in: owned.map((s) => s._id) }, $or: [{ 'chargeGuard.state': 'PROBATION', 'chargeGuard.probationUntil': { $lte: new Date() } }, { chargers: { $elemMatch: { 'chargeGuard.state': 'PROBATION', 'chargeGuard.probationUntil': { $lte: new Date() } } } }] }).select('_id')
     for (const { _id } of expired) await mongoose.connection.transaction(async (session) => {
         const station = await ChargingStation.findById(_id).session(session)
         if (station) await expireProbation(station, session)
     })
     const incidents = await ChargingIncident.find({ station: { $in: owned.map((s) => s._id) } })
-        .sort({ resolvedAt: 1, reportedAt: -1 }).limit(200).populate('station', 'name chargeGuard')
+        .sort({ resolvedAt: 1, reportedAt: -1 }).limit(200).populate('station', 'name chargeGuard chargers')
     res.json({ incidents })
 }))
 router.post('/incidents/:id/repair', consumer, wrap(async (req, res) => {
     res.json({ incident: await declareRepair(req.session.consumerId, req.params.id, req.body || {}), message: 'Repair declaration saved. This is a host declaration, not independent hardware verification.' })
 }))
 router.get('/admin/review', admin, wrap(async (_req, res) => {
-    const stations = await ChargingStation.find({ 'chargeGuard.state': 'SUSPENDED' }).select('name hostId chargeGuard').limit(200)
+    const stations = await ChargingStation.find({ $or: [{ 'chargeGuard.state': 'SUSPENDED' }, { 'chargers.chargeGuard.state': 'SUSPENDED' }] }).select('name hostId chargeGuard chargers').limit(200)
     res.json({ stations })
 }))
 router.get('/admin/stations/:id', admin, wrap(async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid station ID.' })
-    const station = await ChargingStation.findById(req.params.id).select('name hostId chargeGuard')
+    const station = await ChargingStation.findById(req.params.id).select('name hostId chargeGuard chargers')
     if (!station) return res.status(404).json({ message: 'Station not found.' })
     const incidents = await ChargingIncident.find({ station: station._id }).sort({ reportedAt: 1 })
     const events = await IncidentEvent.find({ station: station._id }).sort({ at: 1, _id: 1 })

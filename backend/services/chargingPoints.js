@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { healthState } from './chargeGuard.js'
 import Booking from '../models/Booking.js'
 import { CHARGING_NETWORKS } from '../../shared/chargingPoints.js'
 
@@ -77,9 +78,9 @@ export async function stationViews(stations) {
           if (b.endTime <= a || b.startTime >= z) return [[a, z]]
           return [...(a < b.startTime ? [[a, b.startTime]] : []), ...(z > b.endTime ? [[b.endTime, z]] : [])]
         })
-        if (point.availability === 'available') for (const [startTime, endTime] of windows) timeSlots.push({ date: dayDate.toISOString(), startTime, endTime, status: 'available' })
+        if (point.availability === 'available' && !['PAUSED', 'SUSPENDED'].includes(healthState(point)) && station.status === 'available' && !['PAUSED', 'SUSPENDED'].includes(healthState(station))) for (const [startTime, endTime] of windows) timeSlots.push({ date: dayDate.toISOString(), startTime, endTime, status: 'available' })
       }
-      return { ...point, occupied: blocks.some((b) => b.startAt <= now && b.endAt > now), timeSlots }
+      return { ...point, chargeGuard: { ...point.chargeGuard, state: healthState(point) }, occupied: blocks.some((b) => b.startAt <= now && b.endAt > now), timeSlots }
     })
     return station
   })

@@ -2,6 +2,9 @@ import mongoose from 'mongoose'
 
 export const ISSUE_CATEGORIES = ['charging_did_not_start', 'charger_malfunction', 'power_unavailable', 'host_unavailable', 'other']
 const schema = new mongoose.Schema({
+    chargingPointId: { type: mongoose.Schema.Types.ObjectId, default: null, immutable: true },
+    chargingPointName: { type: String, default: '', immutable: true },
+    connectorTypes: { type: [String], default: [], immutable: true },
     station: { type: mongoose.Schema.Types.ObjectId, ref: 'ChargingStation', required: true, immutable: true, index: true },
     booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true, immutable: true },
     consumerId: { type: String, required: true, immutable: true },
@@ -21,4 +24,5 @@ const schema = new mongoose.Schema({
     },
 })
 schema.index({ booking: 1, category: 1 }, { unique: true })
+schema.index({ station: 1, chargingPointId: 1, category: 1, reportedAt: -1 })
 export default mongoose.model('ChargingIncident', schema)

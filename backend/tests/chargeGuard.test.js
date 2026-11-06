@@ -1,3 +1,6 @@
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import { before, after, beforeEach, test } from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
@@ -92,7 +95,8 @@ test('category, explanation and same-site JSON validation', async () => {
   assert.equal((await report({ description: {} })).status, 400)
   assert.equal((await report({ description: 'a'.repeat(2001) })).status, 400)
   assert.equal((await request(app).post('/api/chargeguard/reports').set('sec-fetch-site', 'cross-site').send({})).status, 403)
-  const result = await report({ stationId: String(new mongoose.Types.ObjectId()), reportedAt: '2000-01-01' })
+  assert.equal((await report({ stationId: String(new mongoose.Types.ObjectId()) })).status, 403)
+  const result = await report({ stationId: station.id, reportedAt: '2000-01-01' })
   assert.equal(result.body.incident.station, String(station._id))
   assert.ok(new Date(result.body.incident.reportedAt).getFullYear() > 2000)
 })
@@ -219,4 +223,93 @@ test('missing or short administrator credentials fail closed', async () => {
     assert.equal((await request(app).get('/api/chargeguard/admin/review').auth(token || 'empty', { type: 'bearer' })).status, 403)
   }
   process.env.CHARGEGUARD_ADMIN_TOKEN = adminToken
+})
+
+async function dockSetup() {
+  station.pointBookingEnabled = true
+  const base = station.chargers[0].toObject(); delete base._id
+  station.chargers = Array.from({ length: 5 }, (_, i) => ({ ...base, name: 'Dock ' + (i + 1), pricePerKWh: 10 }))
+  await station.save()
+  booking.chargingPointId = station.chargers[2]._id; booking.chargingPointName = 'Dock 3'; await booking.save()
+}
+const freshBackend = (state) => promisify(execFile)(process.execPath, [fileURLToPath(new URL('./dockReloadProbe.js', import.meta.url)), mongo.getUri(), station.id, state])
+const dockBook = (index, actor = user, batteryId = consumer.batteries[0]._id) => {
+  const tomorrow = new Date(Date.now() + 86400000)
+  const date = [tomorrow.getFullYear(), String(tomorrow.getMonth() + 1).padStart(2, '0'), String(tomorrow.getDate()).padStart(2, '0')].join('-')
+  return request(app).post('/api/bookings').set('x-test-user', actor).send({ stationId: station.id, chargingPointId: station.chargers[index].id, batteryId: String(batteryId), date, startTime: '10:00', endTime: '11:00', initialCharge: 20, finalCharge: 30 })
+}
+test('five docks: assigned report, healthy reservation, repair, independent repeat, admin and reload', async () => {
+  await dockSetup()
+  const result = await report(); assert.equal(result.status, 201)
+  const incidentId = result.body.incident._id
+  assert.equal(result.body.incident.chargingPointName, 'Dock 3')
+  assert.equal(result.body.incident.chargingPointId, station.chargers[2].id)
+  let saved = await getStation()
+  assert.deepEqual(saved.chargers.map(p => p.chargeGuard.state), ['ACTIVE', 'ACTIVE', 'PAUSED', 'ACTIVE', 'ACTIVE'])
+  assert.equal(saved.chargeGuard.state, 'ACTIVE')
+  await freshBackend('PAUSED')
+  const host = await request(app).get('/api/chargeguard/host/incidents').set('x-test-user', owner)
+  assert.equal(host.body.incidents[0].chargingPointName, 'Dock 3')
+  assert.equal((await dockBook(2)).status, 409)
+  const secondConsumer = await Consumer.create({ firstName: 'B', lastName: 'Driver', batteries: [consumer.batteries[0].toObject()] })
+  assert.equal((await dockBook(3, secondConsumer.id, secondConsumer.batteries[0]._id)).status, 201)
+  const listing = (await request(app).get('/api/charging-stations')).body.stations.find(s => s._id === station.id)
+  assert.equal(listing.chargers[2].timeSlots.length, 0)
+  for (const i of [0, 1, 3, 4]) assert.ok(listing.chargers[i].timeSlots.length)
+  assert.equal((await post('/incidents/' + incidentId + '/repair', repair, owner)).status, 200)
+  saved = await getStation(); assert.equal(saved.chargers[2].chargeGuard.state, 'PROBATION')
+  assert.equal(saved.chargers[2].chargeGuard.probationUntil - saved.chargers[2].chargeGuard.repairAt, 86400000)
+  await freshBackend('PROBATION')
+  const thirdConsumer = await Consumer.create({ firstName: 'C', lastName: 'Driver', batteries: [consumer.batteries[0].toObject()] })
+  const third = await makeBooking({ consumerId: thirdConsumer.id, batteryId: thirdConsumer.batteries[0]._id, chargingPointId: station.chargers[2]._id, startAt: new Date() })
+  const repeat = await report({ bookingId: third.id }, thirdConsumer.id); assert.equal(repeat.status, 201)
+  saved = await getStation(); assert.equal(saved.chargers[2].chargeGuard.state, 'SUSPENDED')
+  assert.equal(saved.chargers[3].chargeGuard.state, 'ACTIVE')
+  await freshBackend('SUSPENDED')
+  assert.equal((await dockBook(2)).status, 409)
+  assert.equal((await post('/incidents/' + repeat.body.incident._id + '/repair', repair, owner)).status, 409)
+  const adminPath = '/api/chargeguard/admin/stations/' + station.id + '/reactivate'
+  const decision = { chargingPointId: station.chargers[2].id, decision: 'Reviewed repair evidence', reviewer: 'Test admin' }
+  assert.equal((await request(app).post(adminPath).send(decision)).status, 403)
+  assert.equal((await request(app).post(adminPath).set('Authorization', 'Bearer ' + adminToken).send(decision)).status, 200)
+  const uri = mongo.getUri(); await mongoose.disconnect(); await mongoose.connect(uri)
+  saved = await getStation(); assert.equal(saved.chargers[2].chargeGuard.state, 'ACTIVE')
+  await freshBackend('ACTIVE')
+  assert.equal((await ChargingIncident.findById(incidentId)).chargingPointName, 'Dock 3')
+  assert.equal(await IncidentEvent.countDocuments({ station: station._id, chargingPointId: station.chargers[2]._id }), 4)
+})
+test('dock identity validation, duplicate reports and legacy scope cannot select unrelated docks', async () => {
+  await dockSetup()
+  for (const id of [station.chargers[3].id, String(new mongoose.Types.ObjectId())]) assert.equal((await report({ chargingPointId: id })).status, 403)
+  assert.equal((await report({ chargingPointId: 'invalid' })).status, 400)
+  const results = await Promise.all([report(), report()]); assert.deepEqual(results.map(r => r.status).sort(), [201, 409])
+  const legacy = await makeBooking()
+  assert.equal((await report({ bookingId: legacy.id, chargingPointId: station.chargers[0].id })).status, 409)
+  assert.equal((await report({ bookingId: legacy.id })).status, 409)
+  assert.equal((await getStation()).chargers[3].chargeGuard.state, 'ACTIVE')
+})
+test('another dock report does not count as repeat or prevent repairing Dock 3', async () => {
+  await dockSetup()
+  const first = await report()
+  const fourthBooking = await makeBooking({ chargingPointId: station.chargers[3]._id })
+  const fourth = await report({ bookingId: fourthBooking.id }); assert.equal(fourth.status, 201)
+  assert.equal((await post('/incidents/' + first.body.incident._id + '/repair', repair, owner)).status, 200)
+  assert.equal((await getStation()).chargers[2].chargeGuard.state, 'PROBATION')
+  assert.equal((await getStation()).chargers[3].chargeGuard.state, 'PAUSED')
+  assert.equal((await post('/incidents/' + fourth.body.incident._id + '/repair', repair, owner)).status, 200)
+  station = await getStation(); station.chargers[2].chargeGuard.probationUntil = new Date(Date.now() - 1000); await station.save()
+  await request(app).get('/api/chargeguard/host/incidents').set('x-test-user', owner)
+  assert.equal((await getStation()).chargers[2].chargeGuard.state, 'ACTIVE')
+  assert.equal((await getStation()).chargers[3].chargeGuard.state, 'PROBATION')
+})
+
+test('host point edits cannot overwrite health and station closure still blocks healthy docks', async () => {
+  await dockSetup(); await report()
+  const saved = await getStation()
+  const points = saved.chargers.map(p => ({ ...p.toObject(), chargeGuard: { state: 'ACTIVE' } }))
+  const edited = await request(app).put('/api/charging-stations/' + station.id + '/points').set('x-test-user', owner).send({ chargingPoints: points })
+  assert.equal(edited.status, 200, JSON.stringify(edited.body))
+  assert.equal((await getStation()).chargers[2].chargeGuard.state, 'PAUSED')
+  station = await getStation(); station.status = 'offline'; await station.save()
+  assert.equal((await dockBook(3)).status, 400)
 })
